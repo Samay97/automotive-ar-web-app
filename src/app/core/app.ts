@@ -9,6 +9,7 @@ import {
   Engine,
   FreeCamera,
   HemisphericLight,
+  IWebXRAnchor,
   IWebXRHitResult,
   IWebXRPlane,
   Mesh,
@@ -113,6 +114,27 @@ export class App {
       true
     ) as WebXRAnchorSystem;
 
+
+    // Anchors
+    const allAnchors = new Map();
+    
+    anchors.onAnchorAddedObservable.add((newAnchor: IWebXRAnchor) => {
+      allAnchors.set(newAnchor.id, newAnchor);
+    });
+
+    anchors.onAnchorUpdatedObservable.add((updatedAnchor: IWebXRAnchor) => {
+      allAnchors.set(updatedAnchor.id, updatedAnchor);
+    });    
+    
+    anchors.onAnchorRemovedObservable.add((deletedAnchor: IWebXRAnchor) => {
+      allAnchors.delete(deletedAnchor.id);
+    });
+
+    setInterval(()=> {
+      console.log(allAnchors);
+    }, 4500);
+
+
     // const planeDetector: WebXRPlaneDetector = featureManager.enableFeature( WebXRPlaneDetector.Name, 'latest', { }, true, true) as WebXRPlaneDetector;
     // this.initPlaneDetector(planeDetector, sessionManager);
 
@@ -134,6 +156,8 @@ export class App {
         this.hitTestResult.transformationMatrix.decompose(undefined, this.box.rotationQuaternion, this.box.position);
         this.box.position.y += 0.1 / 2;
         this.box.isVisible = true;
+
+        anchors.addAnchorPointUsingHitTestResultAsync(this.hitTestResult).then(() => console.log('Added Anchor'));
       }
     };
   }
