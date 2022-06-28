@@ -86,7 +86,7 @@ export class App {
     camera.setTarget(Vector3.Zero());
     camera.attachControl(canvas, true);
     camera.minZ = 0.1;
-    camera.wheelPrecision = 20;
+    camera.wheelPrecision = 50;
 
     const sessionMode = 'immersive-ar';
     const xr: WebXRDefaultExperience = await this.scene.createDefaultXRExperienceAsync({
@@ -169,9 +169,9 @@ export class App {
       const rotationQuaternion = box.rotationQuaternion ?? undefined;
       newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
 
-      const box2 = MeshBuilder.CreateBox('box', { size: 1 }, this.scene);
-      const rotationQuaternion2 = box2.rotationQuaternion ?? undefined;
-      newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion2, box2.position);
+      // const box2 = MeshBuilder.CreateBox('box', { size: 1 }, this.scene);
+      // const rotationQuaternion2 = box2.rotationQuaternion ?? undefined;
+      // newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion2, box2.position);
 
       this.allAnchors.set(newAnchor.id, newAnchor);
       this.anchorMeshs.set(newAnchor.id, box);
