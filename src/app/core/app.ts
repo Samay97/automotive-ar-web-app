@@ -1,7 +1,4 @@
-import '@babylonjs/loaders/glTF';
-import '@babylonjs/core/Debug/debugLayer';
-import '@babylonjs/inspector';
-
+import { environment } from 'src/environments/environment';
 import {
   ArcRotateCamera,
   AssetsManager,
@@ -41,6 +38,9 @@ import { NgZone } from '@angular/core';
 import { XRSession } from './xr-session';
 import * as earcut from 'earcut';
 (window as any).earcut = earcut;
+import '@babylonjs/loaders/glTF';
+import { loadInspector } from './helper/inspector';
+loadInspector();
 
 export class App {
   private engine: Engine;
