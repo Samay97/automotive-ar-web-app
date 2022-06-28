@@ -1,9 +1,10 @@
-// import '@babylonjs/loaders/glTF';
-//import '@babylonjs/core/Debug/debugLayer';
-//import '@babylonjs/inspector';
+import '@babylonjs/loaders/glTF';
+import '@babylonjs/core/Debug/debugLayer';
+import '@babylonjs/inspector';
 
 import {
   ArcRotateCamera,
+  AssetsManager,
   Color3,
   DeviceOrientationCamera,
   Engine,
@@ -30,6 +31,9 @@ import {
   WebXRPlaneDetector,
   WebXRSessionManager,
   WebXRState,
+  ISceneLoaderAsyncResult,
+  TransformNode,
+  Nullable,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -37,10 +41,6 @@ import { NgZone } from '@angular/core';
 import { XRSession } from './xr-session';
 import * as earcut from 'earcut';
 (window as any).earcut = earcut;
-
-const requiredXRFeatures: Array<{ name: string; version: string }> = [
-  { name: WebXRPlaneDetector.Name, version: 'latest' },
-];
 
 export class App {
   private engine: Engine;
@@ -52,9 +52,9 @@ export class App {
 
   private hitTestResult?: IWebXRHitResult | null;
   private cursor!: Mesh;
-  private box: any;
 
-  private xrAvailable = false;
+  private carRoot!: TransformNode;
+
   private windowResizeSubscription: Subscription = Subscription.EMPTY;
 
   constructor(canvas: HTMLCanvasElement, private ngZone: NgZone) {
@@ -114,26 +114,76 @@ export class App {
       true
     ) as WebXRAnchorSystem;
 
-
     // Anchors
     const allAnchors = new Map();
-    
+    const allBoxes = new Map();
+
     anchors.onAnchorAddedObservable.add((newAnchor: IWebXRAnchor) => {
+      const box = this.buildBox();
+      const rotationQuaternion = box.rotationQuaternion ?? undefined;
+      newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
+
       allAnchors.set(newAnchor.id, newAnchor);
+      allBoxes.set(newAnchor.id, box);
     });
 
     anchors.onAnchorUpdatedObservable.add((updatedAnchor: IWebXRAnchor) => {
+      const box = allBoxes.get(updatedAnchor.id);
+      const rotationQuaternion = box.rotationQuaternion ?? undefined;
+      updatedAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
+
       allAnchors.set(updatedAnchor.id, updatedAnchor);
-    });    
-    
-    anchors.onAnchorRemovedObservable.add((deletedAnchor: IWebXRAnchor) => {
-      allAnchors.delete(deletedAnchor.id);
+      allBoxes.set(updatedAnchor.id, box);
     });
 
-    setInterval(()=> {
-      console.log(allAnchors);
-    }, 4500);
+    anchors.onAnchorRemovedObservable.add((deletedAnchor: IWebXRAnchor) => {
+      allAnchors.delete(deletedAnchor.id);
+      allBoxes.delete(deletedAnchor.id);
+    });
 
+    let carPlaced = false;
+
+    SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/porsche_4s_commpressed.glb', undefined, this.scene).then(
+      (result: ISceneLoaderAsyncResult) => {
+        const carRoot: TransformNode | undefined = result.transformNodes.find((el) => el.name === 'Sketchfab_model');
+        if (carRoot) {
+          this.carRoot = carRoot;
+          carRoot.scaling = new Vector3(0.125, 0.125, 0.125);
+          console.log('loaded - Car');
+        }
+      }
+    );
+
+    setInterval(() => {
+      if (carPlaced) return;
+      if (allAnchors.size !== 4) return;
+      carPlaced = true;
+      console.log('Placing car');
+
+      const decomposedPostions: any[] = []; // 2d array with rotation, translation
+
+      allAnchors.forEach((anchor: IWebXRAnchor, key: string) => {
+        const rotation = new Quaternion();
+        const translation = Vector3.Zero();
+        decomposedPostions.push([rotation, translation]);
+        anchor.transformationMatrix.decompose(undefined, rotation, translation);
+      });
+
+      let totalX = 0;
+      let totalZ = 0;
+      let totalY = 0;
+      decomposedPostions.forEach((element: any[]) => {
+        totalX += (element[1] as Vector3).x;
+        totalZ += (element[1] as Vector3).z;
+        totalY += (element[1] as Vector3).y;
+      });
+
+      const centerX = totalX / decomposedPostions.length;
+      const centerZ = totalZ / decomposedPostions.length;
+      const centerY = totalY / decomposedPostions.length;
+
+      this.carRoot.position = new Vector3(centerX, centerY, centerZ);
+    }, 4500);
 
     // const planeDetector: WebXRPlaneDetector = featureManager.enableFeature( WebXRPlaneDetector.Name, 'latest', { }, true, true) as WebXRPlaneDetector;
     // this.initPlaneDetector(planeDetector, sessionManager);
@@ -153,13 +203,24 @@ export class App {
 
     this.scene.onPointerDown = () => {
       if (this.hitTestResult) {
-        this.hitTestResult.transformationMatrix.decompose(undefined, this.box.rotationQuaternion, this.box.position);
-        this.box.position.y += 0.1 / 2;
-        this.box.isVisible = true;
+        // this.hitTestResult.transformationMatrix.decompose(undefined, this.box.rotationQuaternion, this.box.position);
+        // this.box.position.y += 0.1 / 2;
+        // this.box.isVisible = false;
 
-        anchors.addAnchorPointUsingHitTestResultAsync(this.hitTestResult).then(() => console.log('Added Anchor'));
+        if (allAnchors.size < 4) {
+          anchors.addAnchorPointUsingHitTestResultAsync(this.hitTestResult).then(() => console.log('Added Anchor'));
+        }
       }
     };
+  }
+
+  public buildBox(): Mesh {
+    const box = MeshBuilder.CreateBox('box', { size: 0.1 }, this.scene);
+    const boxMaterial = new StandardMaterial('boxMaterial', this.scene);
+    boxMaterial.diffuseColor = Color3.FromHexString('#5853e6');
+    box.material = boxMaterial;
+    box.isVisible = true;
+    return box;
   }
 
   public buildScene(): void {
@@ -170,13 +231,6 @@ export class App {
     reticleMaterial.roughness = 1;
     this.cursor.material = reticleMaterial;
     this.cursor.isVisible = false;
-
-    // Box
-    this.box = MeshBuilder.CreateBox('box', { size: 0.1 }, this.scene);
-    const boxMaterial = new StandardMaterial('boxMaterial', this.scene);
-    boxMaterial.diffuseColor = Color3.FromHexString('#5853e6');
-    this.box.material = boxMaterial;
-    this.box.isVisible = false;
 
     // Light
     const light = new HemisphericLight('light', new Vector3(-0.5, -1, -0.25), this.scene);
