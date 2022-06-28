@@ -32,6 +32,9 @@ import {
   Nullable,
   WebXRLightEstimation,
   Matrix,
+  HDRCubeTexture,
+  Texture,
+  CubeTexture,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -83,6 +86,7 @@ export class App {
     camera.setTarget(Vector3.Zero());
     camera.attachControl(canvas, true);
     camera.minZ = 0.1;
+    camera.wheelPrecision = 20;
 
     const sessionMode = 'immersive-ar';
     const xr: WebXRDefaultExperience = await this.scene.createDefaultXRExperienceAsync({
@@ -105,6 +109,20 @@ export class App {
     this.addAnchorSystem();
     this.addHitTest();
     this.addLightEstimation();
+
+    xr.baseExperience.onStateChangedObservable.add((state) => {
+      switch (state) {
+        case WebXRState.IN_XR:
+        // XR is initialized and already submitted one frame
+        case WebXRState.ENTERING_XR:
+        // xr is being initialized, enter XR request was made
+        case WebXRState.EXITING_XR:
+          this.enterXR();
+          break;
+        case WebXRState.NOT_IN_XR:
+        // self explanatory - either out or not yet in XR
+      }
+    });
   }
 
   private addHitTest(): void {
@@ -150,6 +168,10 @@ export class App {
       const box = this.buildAnchorMesh();
       const rotationQuaternion = box.rotationQuaternion ?? undefined;
       newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
+
+      const box2 = MeshBuilder.CreateBox('box', { size: 1 }, this.scene);
+      const rotationQuaternion2 = box2.rotationQuaternion ?? undefined;
+      newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion2, box2.position);
 
       this.allAnchors.set(newAnchor.id, newAnchor);
       this.anchorMeshs.set(newAnchor.id, box);
@@ -328,7 +350,7 @@ export class App {
   */
 
   public buildAnchorMesh(): Mesh {
-    const box = MeshBuilder.CreateCapsule('box', { radius: 0.01, tessellation: 8, height: 2 }, this.scene);
+    const box = MeshBuilder.CreateCapsule('box', { radius: 0.01, tessellation: 16, height: 1 }, this.scene);
     const boxMaterial = new StandardMaterial('boxMaterial', this.scene);
     boxMaterial.diffuseColor = Color3.FromHexString('#5853e6');
     box.material = boxMaterial;
@@ -345,12 +367,6 @@ export class App {
     this.cursor.material = reticleMaterial;
     this.cursor.isVisible = false;
 
-    // Light
-    const light = new HemisphericLight('HemiLight', new Vector3(0, 1, 0), this.scene);
-    light.diffuse = Color3.FromHexString('#ffffff');
-    light.groundColor = Color3.FromHexString('#bbbbff');
-    light.intensity = 1;
-
     // Car
     SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/porsche_4s_commpressed.glb', undefined, this.scene).then(
       (result: ISceneLoaderAsyncResult) => {
@@ -364,6 +380,11 @@ export class App {
         }
       }
     );
+
+    // HDR
+    const hdrTexture = CubeTexture.CreateFromPrefilteredData('assets/environment.env', this.scene);
+    this.scene.environmentTexture = hdrTexture;
+    const skybox = this.scene.createDefaultSkybox(hdrTexture, true, 80, 0.3);
   }
 
   private registerWindowEvents(): void {
@@ -397,11 +418,7 @@ export class App {
     const centerX = totalX / this.allAnchors.size;
     const centerZ = totalZ / this.allAnchors.size;
     const centerY = totalY / this.allAnchors.size;
-
-    const box = this.buildAnchorMesh();
-    this.carRoot.position = new Vector3(centerX, centerY, centerZ);
-    box.position = new Vector3(centerX, centerY, centerZ);
-
+    this.carRoot.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
     console.log('Car position updated');
   }
 
@@ -409,7 +426,6 @@ export class App {
     planeDetector: WebXRPlaneDetector,
     sessionManager: WebXRSessionManager
   ): Promise<void> {
-    //this.scene = await SceneLoader.LoadAsync('assets/', 'porsche_4s_commpressed.glb', this.engine);
     const planes: any[] = [];
 
     planeDetector.onPlaneAddedObservable.add((plane: any) => {
@@ -472,6 +488,11 @@ export class App {
       planes.forEach((plane) => plane.dispose());
       while (planes.pop()) {}
     });
+  }
+
+  private enterXR(): void {
+    this.scene.getMeshByName('hdrSkyBox')?.dispose();
+    this.scene.environmentTexture?.dispose();
   }
 
   public startRender(): void {
