@@ -31,6 +31,7 @@ import {
   TransformNode,
   Nullable,
   WebXRLightEstimation,
+  Matrix,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -327,7 +328,7 @@ export class App {
   */
 
   public buildAnchorMesh(): Mesh {
-    const box = MeshBuilder.CreateCapsule('box', { radius: 0.25, tessellation: 8, height: 1 }, this.scene);
+    const box = MeshBuilder.CreateCapsule('box', { radius: 0.01, tessellation: 8, height: 2 }, this.scene);
     const boxMaterial = new StandardMaterial('boxMaterial', this.scene);
     boxMaterial.diffuseColor = Color3.FromHexString('#5853e6');
     box.material = boxMaterial;
@@ -358,6 +359,7 @@ export class App {
           this.carRoot = carRoot;
           carRoot.scaling = new Vector3(0.1, 0.1, 0.1);
           carRoot.position = Vector3.Zero();
+          // carRoot.setPivotMatrix(Matrix.Translation(0,1,0), false); // set pivot to center of car
           console.log('loaded - Car');
         }
       }
@@ -384,7 +386,7 @@ export class App {
 
     this.allAnchors.forEach((anchor: IWebXRAnchor, key: string) => {
       const rotation = new Quaternion();
-      const translation = Vector3.Zero();
+      const translation = new Vector3();
       anchor.transformationMatrix.decompose(undefined, rotation, translation);
 
       totalX += translation.x;
@@ -395,7 +397,11 @@ export class App {
     const centerX = totalX / this.allAnchors.size;
     const centerZ = totalZ / this.allAnchors.size;
     const centerY = totalY / this.allAnchors.size;
+
+    const box = this.buildAnchorMesh();
     this.carRoot.position = new Vector3(centerX, centerY, centerZ);
+    box.position = new Vector3(centerX, centerY, centerZ);
+
     console.log('Car position updated');
   }
 
