@@ -44,4 +44,5 @@ Navigate to `http://localhost:4200/`
 ## Thanks to
 
 - J'adore les voiture (theo9728) - For his great work on the porsche 4s model [sketchfab](https://skfb.ly/oovW9)
+- Tanvir Ahmed - For his great work on the nissan GTR model [sketchfab](https://skfb.ly/6Cq8u)
 

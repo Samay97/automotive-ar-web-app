@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, ElementRef, NgZone, ViewChild } from '@angular/core';
-import { App } from './core/app';
+import { App } from './core';
 
 @Component({
   selector: 'app-root',
@@ -8,6 +8,8 @@ import { App } from './core/app';
 })
 export class AppComponent implements AfterViewInit {
   public error: Error | null = null;
+  public app!: App;
+  public fps: string = '0';
 
   @ViewChild('canvas', { static: true }) private canvas?: ElementRef<HTMLCanvasElement>;
 
@@ -16,11 +18,19 @@ export class AppComponent implements AfterViewInit {
   public async ngAfterViewInit(): Promise<void> {
     if (this.canvas) {
       try {
-        const app = new App(this.canvas.nativeElement, this.ngZone);
+        this.app = new App(this.canvas.nativeElement, this.ngZone);
+        this.app.startRender();
+        setInterval(() => {
+          this.fps = this.app.fps;
+        }, 10);
       } catch (e: any) {
         console.error(e);
         this.error = e;
       }
     }
+  }
+
+  public enterXR(): void {
+    this.app.enterXRMode();
   }
 }

@@ -1,14 +1,9 @@
 import {
   ArcRotateCamera,
-  AssetsManager,
   Color3,
-  DeviceOrientationCamera,
   Engine,
-  FreeCamera,
-  HemisphericLight,
   IWebXRAnchor,
   IWebXRHitResult,
-  IWebXRPlane,
   Mesh,
   MeshBuilder,
   PolygonMeshBuilder,
@@ -21,7 +16,6 @@ import {
   WebXRAnchorSystem,
   WebXRCamera,
   WebXRDefaultExperience,
-  WebXRExperienceHelper,
   WebXRFeaturesManager,
   WebXRHitTest,
   WebXRPlaneDetector,
@@ -29,12 +23,9 @@ import {
   WebXRState,
   ISceneLoaderAsyncResult,
   TransformNode,
-  Nullable,
   WebXRLightEstimation,
-  Matrix,
-  HDRCubeTexture,
-  Texture,
   CubeTexture,
+  AbstractMesh,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -43,8 +34,8 @@ import { XRSession } from './xr-session';
 import * as earcut from 'earcut';
 (window as any).earcut = earcut;
 import '@babylonjs/loaders/glTF';
-import { loadInspector } from './helper/inspector';
-loadInspector();
+
+const sessionMode = 'immersive-ar';
 
 export class App {
   private engine: Engine;
@@ -62,8 +53,10 @@ export class App {
 
   private allAnchors = new Map();
   private anchorMeshs = new Map();
-  private carRoot!: TransformNode;
+  private carRoot: TransformNode | AbstractMesh | undefined;
   private cursor!: Mesh;
+
+  public fps: string = '0';
 
   constructor(canvas: HTMLCanvasElement, private ngZone: NgZone) {
     this.engine = new Engine(canvas);
@@ -71,8 +64,6 @@ export class App {
     this.registerWindowEvents();
     this.initXRSession(canvas);
     this.buildScene();
-
-    this.startRender();
   }
 
   private async initXRSession(canvas: HTMLCanvasElement): Promise<void> {
@@ -87,11 +78,14 @@ export class App {
     camera.attachControl(canvas, true);
     camera.minZ = 0.1;
     camera.wheelPrecision = 50;
+    camera.beta = 1.2;
+    camera.alpha = 1.13;
+    camera.radius = 6;
 
-    const sessionMode = 'immersive-ar';
     const xr: WebXRDefaultExperience = await this.scene.createDefaultXRExperienceAsync({
       uiOptions: { sessionMode, referenceSpaceType: 'local-floor' },
     });
+    this.webXR = xr;
 
     const sessionManager: WebXRSessionManager = xr.baseExperience.sessionManager;
     const webXRCamera: WebXRCamera = xr.baseExperience.camera;
@@ -113,11 +107,15 @@ export class App {
     xr.baseExperience.onStateChangedObservable.add((state) => {
       switch (state) {
         case WebXRState.IN_XR:
-        // XR is initialized and already submitted one frame
+          console.log('IN_XR');
+          break;
         case WebXRState.ENTERING_XR:
-        // xr is being initialized, enter XR request was made
-        case WebXRState.EXITING_XR:
+          console.log('ENTERING_XR');
           this.enterXR();
+          break;
+        case WebXRState.EXITING_XR:
+          console.log('EXITING_XR');
+          this.laveXR();
           break;
         case WebXRState.NOT_IN_XR:
         // self explanatory - either out or not yet in XR
@@ -349,7 +347,7 @@ export class App {
   }
   */
 
-  public buildAnchorMesh(): Mesh {
+  private buildAnchorMesh(): Mesh {
     const box = MeshBuilder.CreateCapsule('box', { radius: 0.01, tessellation: 16, height: 1 }, this.scene);
     const boxMaterial = new StandardMaterial('boxMaterial', this.scene);
     boxMaterial.diffuseColor = Color3.FromHexString('#5853e6');
@@ -358,7 +356,7 @@ export class App {
     return box;
   }
 
-  public buildScene(): void {
+  private buildScene(): void {
     // Reticle
     this.cursor = MeshBuilder.CreateDisc('reticle', { radius: 0.05 }, this.scene);
     const reticleMaterial = new StandardMaterial('reticleMaterial', this.scene);
@@ -368,12 +366,15 @@ export class App {
     this.cursor.isVisible = false;
 
     // Car
-    SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/porsche_4s_commpressed.glb', undefined, this.scene).then(
+    SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/gtr.glb', undefined, this.scene).then(
       (result: ISceneLoaderAsyncResult) => {
-        const carRoot: TransformNode | undefined = result.transformNodes.find((el) => el.name === 'Sketchfab_model');
+        let carRoot: TransformNode | AbstractMesh | undefined = result.transformNodes.find(
+          (el) => el.name === 'Sketchfab_model'
+        );
+        if (!carRoot) carRoot = result.meshes.find((el) => el.name === 'Sketchfab_model');
         if (carRoot) {
           this.carRoot = carRoot;
-          carRoot.scaling = new Vector3(0.1, 0.1, 0.1);
+          carRoot.scaling = new Vector3(8, 8, 8);
           carRoot.position = Vector3.Zero();
           // carRoot.setPivotMatrix(Matrix.Translation(0,1,0), false); // set pivot to center of car
           console.log('loaded - Car');
@@ -418,7 +419,8 @@ export class App {
     const centerX = totalX / this.allAnchors.size;
     const centerZ = totalZ / this.allAnchors.size;
     const centerY = totalY / this.allAnchors.size;
-    this.carRoot.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
+    this.carRoot?.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
+    this.carRoot?.setEnabled(true);
     console.log('Car position updated');
   }
 
@@ -492,14 +494,27 @@ export class App {
 
   private enterXR(): void {
     this.scene.getMeshByName('hdrSkyBox')?.dispose();
-    this.scene.environmentTexture?.dispose();
+    //this.scene.environmentTexture?.dispose();
+    this.carRoot?.setEnabled(false);
+  }
+
+  private laveXR(): void {
+    // TODO
   }
 
   public startRender(): void {
-    this.ngZone.runOutsideAngular(() => this.engine.runRenderLoop(() => this.scene.render()));
+    this.engine.runRenderLoop(() => {
+      this.scene.render();
+      this.fps = this.engine.getFps().toFixed();
+    });
   }
 
   public stopRender(): void {
     this.ngZone.runOutsideAngular(() => this.engine.stopRenderLoop(() => this.scene.render()));
+  }
+
+  public enterXRMode(): void {
+    this.enterXR();
+    this.webXR?.baseExperience.enterXRAsync(sessionMode, 'local-floor').then(() => console.log('IN XR'));
   }
 }
