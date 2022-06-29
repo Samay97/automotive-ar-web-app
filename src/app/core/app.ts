@@ -29,6 +29,7 @@ import {
   BaseTexture,
   EventState,
   ShadowGenerator,
+  GroundMesh,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -60,6 +61,7 @@ export class App {
 
   private carRoot: TransformNode | AbstractMesh | undefined;
   private cursor!: Mesh;
+  private ground!: GroundMesh;
 
   public fps: string = '0';
   public carPlaced = false;
@@ -274,9 +276,9 @@ export class App {
 
     // Ground
     const shadowMaterial = new ShadowOnlyMaterial('shadowOnly', this.scene);
-    const ground = MeshBuilder.CreateGround('ground', { width: 30, height: 30 }, this.scene);
-    ground.receiveShadows = true;
-    ground.material = shadowMaterial;
+    this.ground = MeshBuilder.CreateGround('ground', { width: 30, height: 30 }, this.scene);
+    this.ground.receiveShadows = true;
+    this.ground.material = shadowMaterial;
 
     // HDR
     const hdrTexture = CubeTexture.CreateFromPrefilteredData('assets/environment.env', this.scene);
@@ -319,6 +321,9 @@ export class App {
     this.carRoot?.setEnabled(true);
     this.carPlaced = true;
     console.log('Car position updated');
+
+    // Update ground for shadow
+    this.ground.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
 
     // Reset all anchor and helper meshes
     this.anchorMeshs.forEach((anchor: AbstractMesh) => anchor.setEnabled(false));
