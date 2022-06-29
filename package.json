@@ -1,5 +1,5 @@
 {
-  "name": "webxr-webapp-2",
+  "name": "webxr-webapp",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
@@ -21,6 +21,7 @@
     "@angular/router": "^14.0.0",
     "@babylonjs/core": "^5.11.0",
     "@babylonjs/loaders": "^5.11.0",
+    "@babylonjs/materials": "^5.12.1",
     "earcut": "^2.2.3",
     "rxjs": "~7.5.0",
     "tslib": "^2.3.0",
