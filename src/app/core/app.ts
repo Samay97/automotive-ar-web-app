@@ -26,6 +26,9 @@ import {
   WebXRLightEstimation,
   CubeTexture,
   AbstractMesh,
+  BaseTexture,
+  EventState,
+  ShadowGenerator,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -34,6 +37,7 @@ import { XRSession } from './xr-session';
 import * as earcut from 'earcut';
 (window as any).earcut = earcut;
 import '@babylonjs/loaders/glTF';
+import { ShadowOnlyMaterial } from '@babylonjs/materials';
 
 const sessionMode = 'immersive-ar';
 
@@ -42,7 +46,6 @@ export class App {
   private scene: Scene;
   private featureManager!: WebXRFeaturesManager;
   private webXR?: WebXRDefaultExperience;
-  private webXRSessionManager?: WebXRSessionManager;
   private planeDetector?: WebXRPlaneDetector;
   private hitTestResult?: IWebXRHitResult | null;
   private windowResizeSubscription: Subscription = Subscription.EMPTY;
@@ -50,13 +53,16 @@ export class App {
   private hitTestSystem!: WebXRHitTest;
   private anchorSystem!: WebXRAnchorSystem;
   private lightSystem!: WebXRLightEstimation;
+  private shadowGenerator!: ShadowGenerator;
 
   private allAnchors = new Map();
-  private anchorMeshs = new Map();
+  private anchorMeshs = new Map<number, AbstractMesh>();
+
   private carRoot: TransformNode | AbstractMesh | undefined;
   private cursor!: Mesh;
 
   public fps: string = '0';
+  public carPlaced = false;
 
   constructor(canvas: HTMLCanvasElement, private ngZone: NgZone) {
     this.engine = new Engine(canvas);
@@ -132,17 +138,7 @@ export class App {
       false
     ) as WebXRHitTest;
 
-    this.hitTestSystem.onHitTestResultObservable.add((results: IWebXRHitResult[]) => {
-      if (results.length && this.cursor) {
-        this.hitTestResult = results[0];
-        const rotationQuaternion = this.cursor.rotationQuaternion ?? new Quaternion();
-        this.hitTestResult.transformationMatrix.decompose(undefined, rotationQuaternion, this.cursor.position);
-        this.cursor.isVisible = true;
-      } else {
-        this.cursor.isVisible = false;
-        this.hitTestResult = null;
-      }
-    });
+    this.hitTestSystem.onHitTestResultObservable.add(this.onHitResult, undefined, undefined, this);
 
     this.scene.onPointerDown = () => {
       if (this.hitTestResult && this.allAnchors.size < 4) {
@@ -166,10 +162,7 @@ export class App {
       const box = this.buildAnchorMesh();
       const rotationQuaternion = box.rotationQuaternion ?? undefined;
       newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
-
-      // const box2 = MeshBuilder.CreateBox('box', { size: 1 }, this.scene);
-      // const rotationQuaternion2 = box2.rotationQuaternion ?? undefined;
-      // newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion2, box2.position);
+      box.position.y += 0.1 / 2;
 
       this.allAnchors.set(newAnchor.id, newAnchor);
       this.anchorMeshs.set(newAnchor.id, box);
@@ -181,6 +174,8 @@ export class App {
 
     this.anchorSystem.onAnchorUpdatedObservable.add((updatedAnchor: IWebXRAnchor) => {
       const box = this.anchorMeshs.get(updatedAnchor.id);
+      if (!box) return;
+
       const rotationQuaternion = box.rotationQuaternion ?? undefined;
       updatedAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
 
@@ -192,6 +187,18 @@ export class App {
       this.allAnchors.delete(deletedAnchor.id);
       this.anchorMeshs.delete(deletedAnchor.id);
     });
+  }
+
+  private onHitResult(results: IWebXRHitResult[]): void {
+    if (results.length && this.cursor) {
+      this.hitTestResult = results[0];
+      const rotationQuaternion = this.cursor.rotationQuaternion ?? new Quaternion();
+      this.hitTestResult.transformationMatrix.decompose(undefined, rotationQuaternion, this.cursor.position);
+      this.cursor.isVisible = true;
+    } else {
+      this.cursor.isVisible = false;
+      this.hitTestResult = null;
+    }
   }
 
   private addLightEstimation(): void {
@@ -207,148 +214,25 @@ export class App {
       true,
       false
     ) as WebXRLightEstimation;
-  }
 
-  /*
-  public async initXRSession2(): Promise<void> {
-    if (!XRSession.checkDeviceSupport()) {
-      throw new Error('AR Session is not supported');
+    if (this.lightSystem.directionalLight) {
+      console.log('SHadow gen');
+      this.shadowGenerator = new ShadowGenerator(1024, this.lightSystem.directionalLight);
+      this.shadowGenerator.useBlurExponentialShadowMap = true;
+      this.shadowGenerator.useKernelBlur = true;
+      this.shadowGenerator.blurKernel = 40;
+      this.shadowGenerator.setDarkness(0.2);
     }
 
-    const sessionMode = 'immersive-ar';
-    const xr: WebXRDefaultExperience = await this.scene.createDefaultXRExperienceAsync({ uiOptions: { sessionMode } });
-
-    xr.baseExperience.onStateChangedObservable.add((state) => {
-      switch (state) {
-        case WebXRState.IN_XR:
-        // XR is initialized and already submitted one frame
-        case WebXRState.ENTERING_XR:
-        // xr is being initialized, enter XR request was made
-        case WebXRState.EXITING_XR:
-        // xr exit request was made. not yet done.
-        case WebXRState.NOT_IN_XR:
-        // self explanatory - either out or not yet in XR
-      }
+    this.lightSystem.onReflectionCubeMapUpdatedObservable.add((eventData: BaseTexture, eventState: EventState) => {
+      console.log(eventData);
+      console.log(this.lightSystem.directionalLight?.intensity);
     });
-
-    const sessionManager: WebXRSessionManager = xr.baseExperience.sessionManager;
-    const camera: WebXRCamera = xr.baseExperience.camera;
-
-    const isSupported = await sessionManager.isSessionSupportedAsync(sessionMode);
-    if (!isSupported) {
-      throw new Error('AR Session is not supported');
-    }
-
-    const featureManager: WebXRFeaturesManager = xr.baseExperience.featuresManager;
-
-    //const hitTest: WebXRHitTest = featureManager.enableFeature(WebXRHitTest.Name, 'latest', { entityTypes: ['plane'] }, true, true) as WebXRHitTest;
-    const hitTest: WebXRHitTest = featureManager.enableFeature(
-      WebXRHitTest.Name,
-      'latest',
-      {},
-      true,
-      false
-    ) as WebXRHitTest;
-    const anchors: WebXRAnchorSystem = featureManager.enableFeature(
-      WebXRAnchorSystem.Name,
-      'latest',
-      {},
-      true,
-      false
-    ) as WebXRAnchorSystem;
-
-    // Anchors
-    const allAnchors = new Map();
-    const allBoxes = new Map();
-
-    anchors.onAnchorAddedObservable.add((newAnchor: IWebXRAnchor) => {
-      const box = this.buildAnchorMesh();
-      const rotationQuaternion = box.rotationQuaternion ?? undefined;
-      newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
-
-      allAnchors.set(newAnchor.id, newAnchor);
-      allBoxes.set(newAnchor.id, box);
-    });
-
-    anchors.onAnchorUpdatedObservable.add((updatedAnchor: IWebXRAnchor) => {
-      const box = allBoxes.get(updatedAnchor.id);
-      const rotationQuaternion = box.rotationQuaternion ?? undefined;
-      updatedAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
-
-      allAnchors.set(updatedAnchor.id, updatedAnchor);
-      allBoxes.set(updatedAnchor.id, box);
-    });
-
-    anchors.onAnchorRemovedObservable.add((deletedAnchor: IWebXRAnchor) => {
-      allAnchors.delete(deletedAnchor.id);
-      allBoxes.delete(deletedAnchor.id);
-    });
-
-    let carPlaced = false;
-
-    setInterval(() => {
-      if (carPlaced) return;
-      if (allAnchors.size !== 4) return;
-      carPlaced = true;
-      console.log('Placing car');
-
-      const decomposedPostions: any[] = []; // 2d array with rotation, translation
-
-      allAnchors.forEach((anchor: IWebXRAnchor, key: string) => {
-        const rotation = new Quaternion();
-        const translation = Vector3.Zero();
-        decomposedPostions.push([rotation, translation]);
-        anchor.transformationMatrix.decompose(undefined, rotation, translation);
-      });
-
-      let totalX = 0;
-      let totalZ = 0;
-      let totalY = 0;
-      decomposedPostions.forEach((element: any[]) => {
-        totalX += (element[1] as Vector3).x;
-        totalZ += (element[1] as Vector3).z;
-        totalY += (element[1] as Vector3).y;
-      });
-
-      const centerX = totalX / decomposedPostions.length;
-      const centerZ = totalZ / decomposedPostions.length;
-      const centerY = totalY / decomposedPostions.length;
-
-      this.carRoot.position = new Vector3(centerX, centerY, centerZ);
-    }, 4500);
-
-    // const planeDetector: WebXRPlaneDetector = featureManager.enableFeature( WebXRPlaneDetector.Name, 'latest', { }, true, true) as WebXRPlaneDetector;
-    // this.initPlaneDetector(planeDetector, sessionManager);
-
-    hitTest.onHitTestResultObservable.add((results: IWebXRHitResult[]) => {
-      if (results.length && this.cursor) {
-        this.hitTestResult = results[0];
-
-        const rotationQuaternion = this.cursor.rotationQuaternion ?? new Quaternion();
-        this.hitTestResult.transformationMatrix.decompose(undefined, rotationQuaternion, this.cursor.position);
-        this.cursor.isVisible = true;
-      } else {
-        this.cursor.isVisible = false;
-        this.hitTestResult = null;
-      }
-    });
-
-    this.scene.onPointerDown = () => {
-      if (this.hitTestResult) {
-        // this.hitTestResult.transformationMatrix.decompose(undefined, this.box.rotationQuaternion, this.box.position);
-        // this.box.position.y += 0.1 / 2;
-        // this.box.isVisible = false;
-
-        if (allAnchors.size < 4) {
-          anchors.addAnchorPointUsingHitTestResultAsync(this.hitTestResult).then(() => console.log('Added Anchor'));
-        }
-      }
-    };
   }
-  */
 
   private buildAnchorMesh(): Mesh {
-    const box = MeshBuilder.CreateCapsule('box', { radius: 0.01, tessellation: 16, height: 1 }, this.scene);
+    // const box = MeshBuilder.CreateCapsule('box', { radius: 0.01, tessellation: 16, height: 1 }, this.scene);
+    const box = MeshBuilder.CreateBox('box', { size: 0.1 }, this.scene);
     const boxMaterial = new StandardMaterial('boxMaterial', this.scene);
     boxMaterial.diffuseColor = Color3.FromHexString('#5853e6');
     box.material = boxMaterial;
@@ -374,13 +258,25 @@ export class App {
         if (!carRoot) carRoot = result.meshes.find((el) => el.name === 'Sketchfab_model');
         if (carRoot) {
           this.carRoot = carRoot;
-          carRoot.scaling = new Vector3(8, 8, 8);
-          carRoot.position = Vector3.Zero();
+          carRoot.position.y += 0.0045; // fix rims under shadow plane on zero
+          carRoot.scaling = new Vector3(1, 1, 1);
           // carRoot.setPivotMatrix(Matrix.Translation(0,1,0), false); // set pivot to center of car
           console.log('loaded - Car');
+
+          if (this.shadowGenerator) {
+            result.meshes.forEach((mesh: AbstractMesh) => {
+              this.shadowGenerator.getShadowMap()?.renderList?.push(mesh);
+            });
+          }
         }
       }
     );
+
+    // Ground
+    const shadowMaterial = new ShadowOnlyMaterial('shadowOnly', this.scene);
+    const ground = MeshBuilder.CreateGround('ground', { width: 30, height: 30 }, this.scene);
+    ground.receiveShadows = true;
+    ground.material = shadowMaterial;
 
     // HDR
     const hdrTexture = CubeTexture.CreateFromPrefilteredData('assets/environment.env', this.scene);
@@ -421,7 +317,14 @@ export class App {
     const centerY = totalY / this.allAnchors.size;
     this.carRoot?.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
     this.carRoot?.setEnabled(true);
+    this.carPlaced = true;
     console.log('Car position updated');
+
+    // Reset all anchor and helper meshes
+    this.anchorMeshs.forEach((anchor: AbstractMesh) => anchor.setEnabled(false));
+    this.hitTestSystem.onHitTestResultObservable.removeCallback(this.onHitResult, this);
+    this.cursor.dispose();
+    this.hitTestResult = null;
   }
 
   private async initPlaneDetector(
