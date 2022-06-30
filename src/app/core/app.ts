@@ -30,6 +30,10 @@ import {
   EventState,
   ShadowGenerator,
   GroundMesh,
+  WebXRBackgroundRemover,
+  DirectionalLight,
+  HemisphericLight,
+  Matrix,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -39,6 +43,8 @@ import * as earcut from 'earcut';
 (window as any).earcut = earcut;
 import '@babylonjs/loaders/glTF';
 import { ShadowOnlyMaterial } from '@babylonjs/materials';
+import { Light } from '@babylonjs/inspector/stories/Icon.stories';
+import { calculateCenterOfVectors } from './helper/vector';
 
 const sessionMode = 'immersive-ar';
 
@@ -75,6 +81,7 @@ export class App {
   }
 
   private async initXRSession(canvas: HTMLCanvasElement): Promise<void> {
+    // this.testLight();
     // check if WebXR and session is available
     if (!XRSession.checkDeviceSupport()) {
       throw new Error('AR Session is not supported');
@@ -111,6 +118,7 @@ export class App {
     this.addAnchorSystem();
     this.addHitTest();
     this.addLightEstimation();
+    this.addBackroundRemover();
 
     xr.baseExperience.onStateChangedObservable.add((state) => {
       switch (state) {
@@ -191,6 +199,15 @@ export class App {
     });
   }
 
+  private addBackroundRemover(): WebXRBackgroundRemover {
+    return this.featureManager.enableFeature(WebXRBackgroundRemover.Name, 'latest', {
+      environmentHelperRemovalFlags: {
+        skyBox: true,
+        ground: false,
+      },
+    }) as WebXRBackgroundRemover;
+  }
+
   private onHitResult(results: IWebXRHitResult[]): void {
     if (results.length && this.cursor) {
       this.hitTestResult = results[0];
@@ -201,6 +218,20 @@ export class App {
       this.cursor.isVisible = false;
       this.hitTestResult = null;
     }
+  }
+
+  private testLight(): void {
+    const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
+
+    // Default intensity is 1. Let's dim the light a small amount
+    light.intensity = 0.7;
+
+    const dirLight = new DirectionalLight('light dir', new Vector3(0, -1, -0.5), this.scene);
+    dirLight.position = new Vector3(0, 5, -5);
+
+    this.shadowGenerator = new ShadowGenerator(1024 * 2, dirLight);
+    this.shadowGenerator.useBlurExponentialShadowMap = true;
+    this.shadowGenerator.blurKernel = 32;
   }
 
   private addLightEstimation(): void {
@@ -218,18 +249,23 @@ export class App {
     ) as WebXRLightEstimation;
 
     if (this.lightSystem.directionalLight) {
-      console.log('SHadow gen');
+      this.lightSystem.directionalLight.intensity = 1;
+      console.log('Shadow generated');
+      this.lightSystem.directionalLight.shadowMinZ = 3;
+      this.lightSystem.directionalLight.shadowMaxZ = 8;
       this.shadowGenerator = new ShadowGenerator(1024, this.lightSystem.directionalLight);
       this.shadowGenerator.useBlurExponentialShadowMap = true;
-      this.shadowGenerator.useKernelBlur = true;
-      this.shadowGenerator.blurKernel = 40;
+      if (this.ground && this.ground.material)
+        (this.ground.material as ShadowOnlyMaterial).activeLight = this.lightSystem.directionalLight;
       this.shadowGenerator.setDarkness(0.2);
     }
 
+    /*
     this.lightSystem.onReflectionCubeMapUpdatedObservable.add((eventData: BaseTexture, eventState: EventState) => {
       console.log(eventData);
       console.log(this.lightSystem.directionalLight?.intensity);
     });
+    */
   }
 
   private buildAnchorMesh(): Mesh {
@@ -252,7 +288,7 @@ export class App {
     this.cursor.isVisible = false;
 
     // Car
-    SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/gtr.glb', undefined, this.scene).then(
+    SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/porsche_4s.glb', undefined, this.scene).then(
       (result: ISceneLoaderAsyncResult) => {
         let carRoot: TransformNode | AbstractMesh | undefined = result.transformNodes.find(
           (el) => el.name === 'Sketchfab_model'
@@ -260,10 +296,35 @@ export class App {
         if (!carRoot) carRoot = result.meshes.find((el) => el.name === 'Sketchfab_model');
         if (carRoot) {
           this.carRoot = carRoot;
-          carRoot.position.y += 0.0045; // fix rims under shadow plane on zero
+          carRoot.position.y += 0.025; // fix rims under shadow plane on zero
           carRoot.scaling = new Vector3(1, 1, 1);
-          // carRoot.setPivotMatrix(Matrix.Translation(0,1,0), false); // set pivot to center of car
           console.log('loaded - Car');
+
+          const getParentSize = (parent: Mesh) => {
+            const sizes = parent.getHierarchyBoundingVectors();
+            const size = {
+              x: sizes.max.x - sizes.min.x,
+              y: sizes.max.y - sizes.min.y,
+              z: sizes.max.z - sizes.min.z,
+            };
+            return size;
+          };
+
+          if (!this.carRoot) return;
+
+          let bv = this.carRoot.getHierarchyBoundingVectors();
+          let sz = getParentSize(this.carRoot as Mesh);
+
+          /*
+          const box = MeshBuilder.CreateBox('bebugbox', { size: 1 }, this.scene);
+          const  mat = new StandardMaterial("mat", this.scene);
+          mat.alpha = 0;
+          box.material = mat;
+          box.scaling = new Vector3(sz.x, sz.y, sz.z);
+          box.position = new Vector3((bv.min.x + bv.max.x) / 2, (bv.min.y + bv.max.y) / 2, (bv.min.z + bv.max.z) / 2);
+          box.enableEdgesRendering();
+          box.edgesWidth = 4.0;
+          */
 
           if (this.shadowGenerator) {
             result.meshes.forEach((mesh: AbstractMesh) => {
@@ -276,7 +337,7 @@ export class App {
 
     // Ground
     const shadowMaterial = new ShadowOnlyMaterial('shadowOnly', this.scene);
-    this.ground = MeshBuilder.CreateGround('ground', { width: 30, height: 30 }, this.scene);
+    this.ground = MeshBuilder.CreateGround('ground', { width: 2, height: 2 }, this.scene);
     this.ground.receiveShadows = true;
     this.ground.material = shadowMaterial;
 
@@ -300,36 +361,51 @@ export class App {
   }
 
   private placeCar(): void {
-    let totalX = 0;
-    let totalZ = 0;
-    let totalY = 0;
+    if (!this.carRoot) return;
 
-    this.allAnchors.forEach((anchor: IWebXRAnchor, key: string) => {
-      const rotation = new Quaternion();
-      const translation = new Vector3();
-      anchor.transformationMatrix.decompose(undefined, rotation, translation);
+    const transformationMatrix: Matrix[] = Array.from<IWebXRAnchor>(this.allAnchors.values()).map(
+      (el) => el.transformationMatrix
+    );
+    const point = calculateCenterOfVectors(transformationMatrix);
 
-      totalX += translation.x;
-      totalZ += translation.z;
-      totalY += translation.y;
-    });
-
-    const centerX = totalX / this.allAnchors.size;
-    const centerZ = totalZ / this.allAnchors.size;
-    const centerY = totalY / this.allAnchors.size;
-    this.carRoot?.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
-    this.carRoot?.setEnabled(true);
+    this.carRoot?.setAbsolutePosition(point);
+    //this.carRoot?.setEnabled(true);
     this.carPlaced = true;
     console.log('Car position updated');
 
+    const [firstAnchor] = this.anchorMeshs.values();
+    this.carRoot.scaling = this.getCarScaleRelativeToAnchros(point, firstAnchor.position);
+    console.log('Car Scale updated');
+
     // Update ground for shadow
-    this.ground.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
+    this.ground.setAbsolutePosition(point);
 
     // Reset all anchor and helper meshes
     this.anchorMeshs.forEach((anchor: AbstractMesh) => anchor.setEnabled(false));
     this.hitTestSystem.onHitTestResultObservable.removeCallback(this.onHitResult, this);
     this.cursor.dispose();
     this.hitTestResult = null;
+  }
+
+  private getCarScaleRelativeToAnchros(center: Vector3, anchorPosition: Vector3): Vector3 {
+    const sz = {
+      x: Math.abs((anchorPosition.x - center.x) * 2),
+      y: Math.abs((anchorPosition.y - center.y) * 2),
+      z: Math.abs((anchorPosition.z - center.z) * 2),
+    };
+
+    const box = MeshBuilder.CreateBox('bebugbox', { size: 1 }, this.scene);
+    const mat = new StandardMaterial('materiala  debug box', this.scene);
+    mat.alpha = 0;
+    box.material = mat;
+    box.scaling = new Vector3(sz.x, 1, sz.z);
+    box.position = center;
+    box.enableEdgesRendering();
+    box.edgesWidth = 4.0;
+
+    // Get min value from size, car should always scaled in all 3 axes the same amout
+    const min = Math.min(sz.x, sz.z); // sz.y is not required we only need space in x and z height of object will be as it is
+    return new Vector3(min, min, min);
   }
 
   private async initPlaneDetector(
