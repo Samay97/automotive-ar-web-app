@@ -26,8 +26,6 @@ import {
   WebXRLightEstimation,
   CubeTexture,
   AbstractMesh,
-  BaseTexture,
-  EventState,
   ShadowGenerator,
   GroundMesh,
   WebXRBackgroundRemover,
@@ -44,7 +42,6 @@ import * as earcut from 'earcut';
 (window as any).earcut = earcut;
 import '@babylonjs/loaders/glTF';
 import { ShadowOnlyMaterial } from '@babylonjs/materials';
-import { Light } from '@babylonjs/inspector/stories/Icon.stories';
 import { calculateCenterOfVectors } from './helper/vector';
 import { buildBoxMesh, buildConeMesh } from './helper/mesh';
 
@@ -55,7 +52,6 @@ export class App {
   private scene: Scene;
   private featureManager!: WebXRFeaturesManager;
   private webXR?: WebXRDefaultExperience;
-  private planeDetector?: WebXRPlaneDetector;
   private hitTestResult?: IWebXRHitResult | null;
   private windowResizeSubscription: Subscription = Subscription.EMPTY;
 
@@ -421,74 +417,6 @@ export class App {
     // Get min value from size, car should always scaled in all 3 axes the same amout
     const min = Math.min(Math.abs(relation.x), Math.abs(relation.z)); // sz.y is not required we only need space in x and z height of object will be as it is
     return new Vector3(min, min, min);
-  }
-
-  private async initPlaneDetector(
-    planeDetector: WebXRPlaneDetector,
-    sessionManager: WebXRSessionManager
-  ): Promise<void> {
-    const planes: any[] = [];
-
-    planeDetector.onPlaneAddedObservable.add((plane: any) => {
-      if (plane.xrPlane.orientation === 'Vertical') return;
-
-      plane.polygonDefinition.push(plane.polygonDefinition[0]);
-      const polygon_triangulation = new PolygonMeshBuilder(
-        'name',
-        plane.polygonDefinition.map((p: any) => new Vector2(p.x, p.z)),
-        this.scene
-      );
-      const polygon = polygon_triangulation.build(false, 0.01);
-      plane.mesh = polygon;
-      planes[plane.id] = plane.mesh;
-      const mat = new StandardMaterial('mat', this.scene);
-      mat.alpha = 0.5;
-      // pick a random color
-      mat.diffuseColor = Color3.Random();
-      polygon.createNormals(true);
-      plane.mesh.material = mat;
-
-      plane.mesh.rotationQuaternion = new Quaternion();
-      plane.transformationMatrix.decompose(plane.mesh.scaling, plane.mesh.rotationQuaternion, plane.mesh.position);
-    });
-
-    planeDetector.onPlaneUpdatedObservable.add((plane: any) => {
-      if (plane.xrPlane.orientation === 'Vertical') return;
-      let mat;
-      if (plane.mesh) {
-        // keep the material, dispose the old polygon
-        mat = plane.mesh.material;
-        plane.mesh.dispose(false, false);
-      }
-      const some = plane.polygonDefinition.some((p: any) => !p);
-      if (some) {
-        return;
-      }
-      plane.polygonDefinition.push(plane.polygonDefinition[0]);
-      const polygon_triangulation = new PolygonMeshBuilder(
-        'name',
-        plane.polygonDefinition.map((p: any) => new Vector2(p.x, p.z)),
-        this.scene
-      );
-      const polygon = polygon_triangulation.build(false, 0.01);
-      polygon.createNormals(true);
-      plane.mesh = polygon;
-      planes[plane.id] = plane.mesh;
-      plane.mesh.material = mat;
-      plane.mesh.rotationQuaternion = new Quaternion();
-      plane.transformationMatrix.decompose(plane.mesh.scaling, plane.mesh.rotationQuaternion, plane.mesh.position);
-    });
-
-    planeDetector.onPlaneRemovedObservable.add((plane) => {
-      if (plane && planes[plane.id]) {
-        planes[plane.id].dispose();
-      }
-    });
-
-    sessionManager.onXRSessionInit.add(() => {
-      planes.forEach((plane) => plane.dispose());
-      while (planes.pop()) {}
-    });
   }
 
   private enterXR(): void {
