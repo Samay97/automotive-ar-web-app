@@ -1,24 +1,20 @@
 import {
   ArcRotateCamera,
-  Color3,
   Engine,
   IWebXRAnchor,
   IWebXRHitResult,
   Mesh,
   MeshBuilder,
-  PolygonMeshBuilder,
   Quaternion,
   Scene,
   SceneLoader,
   StandardMaterial,
-  Vector2,
   Vector3,
   WebXRAnchorSystem,
   WebXRCamera,
   WebXRDefaultExperience,
   WebXRFeaturesManager,
   WebXRHitTest,
-  WebXRPlaneDetector,
   WebXRSessionManager,
   WebXRState,
   ISceneLoaderAsyncResult,
@@ -33,6 +29,11 @@ import {
   HemisphericLight,
   Matrix,
   BoundingBox,
+  Node,
+  DefaultRenderingPipeline,
+  Xbox360Pad,
+  Space,
+  Axis,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -42,8 +43,10 @@ import * as earcut from 'earcut';
 (window as any).earcut = earcut;
 import '@babylonjs/loaders/glTF';
 import { ShadowOnlyMaterial } from '@babylonjs/materials';
-import { calculateCenterOfVectors } from './helper/vector';
-import { buildBoxMesh, buildConeMesh } from './helper/mesh';
+import { getCarRotation, getCenterOfVectors, getSizeFromBounds, getSizeFromNode } from './helper/vector';
+import { buildBoxMesh, buildConeMesh, createTestBoundsVisuals } from './helper/mesh';
+import { setupArcRotateCamera } from './helper/scene';
+import { environment } from 'src/environments/environment';
 
 const sessionMode = 'immersive-ar';
 
@@ -71,7 +74,7 @@ export class App {
   public carPlaced = false;
 
   constructor(canvas: HTMLCanvasElement, private ngZone: NgZone) {
-    this.engine = new Engine(canvas);
+    this.engine = new Engine(canvas, true);
     this.scene = new Scene(this.engine);
     this.registerWindowEvents();
     this.initXRSession(canvas);
@@ -85,14 +88,7 @@ export class App {
     }
 
     // create camera for not immersive mode
-    const camera = new ArcRotateCamera('camera', 0, 0, 5, Vector3.Zero(), this.scene);
-    camera.setTarget(Vector3.Zero());
-    camera.attachControl(canvas, true);
-    camera.minZ = 0.1;
-    camera.wheelPrecision = 50;
-    camera.beta = 1.2;
-    camera.alpha = 1.13;
-    camera.radius = 6;
+    const camera = setupArcRotateCamera(this.scene, canvas);
 
     const xr: WebXRDefaultExperience = await this.scene.createDefaultXRExperienceAsync({
       uiOptions: { sessionMode, referenceSpaceType: 'local-floor' },
@@ -297,9 +293,12 @@ export class App {
 
     // Ground
     const shadowMaterial = new ShadowOnlyMaterial('shadowOnly', this.scene);
-    this.ground = MeshBuilder.CreateGround('ground', { width: 2, height: 2 }, this.scene);
-    this.ground.receiveShadows = true;
+    this.ground = MeshBuilder.CreateGround('ground', { width: 10, height: 10 }, this.scene);
+
+    // TODO: Fix shadow
+    //this.ground.receiveShadows = true;
     this.ground.material = shadowMaterial;
+    this.ground.visibility = 0;
 
     // HDR
     const hdrTexture = CubeTexture.CreateFromPrefilteredData('assets/environment.env', this.scene);
@@ -326,22 +325,24 @@ export class App {
     const transformationMatrix: Matrix[] = Array.from<IWebXRAnchor>(this.allAnchors.values()).map(
       (el) => el.transformationMatrix
     );
-    const point = calculateCenterOfVectors(transformationMatrix);
-
-    this.carRoot?.setAbsolutePosition(point);
-    this.carRoot?.setEnabled(true);
-    this.carPlaced = true;
-    console.log('Car position updated');
+    const newPoint = getCenterOfVectors(transformationMatrix);
 
     const anchors = Array.from<AbstractMesh>(this.anchorMeshs.values());
-    this.carRoot.scaling = this.getCarScaleRelativeToAnchros(
-      point,
+    const newScaling = this.getCarScaleRelativeToAnchros(
+      newPoint,
       anchors.map((el: AbstractMesh) => el.position)
     );
+
+    // Update Car
+    this.carRoot.setAbsolutePosition(newPoint);
+    this.carRoot.setEnabled(true);
+    this.carPlaced = true;
+    console.log('Car position updated');
+    this.carRoot.scaling = newScaling;
     console.log('Car Scale updated');
 
     // Update ground for shadow
-    this.ground.setAbsolutePosition(point);
+    this.ground.setAbsolutePosition(newPoint);
 
     // Reset all anchor and helper meshes
     this.anchorMeshs.forEach((anchor: AbstractMesh) => anchor.dispose());
@@ -356,62 +357,22 @@ export class App {
 
     const bounds = new BoundingBox(anchorPositions[0], anchorPositions[1]);
 
-    const createTestBoundsVisuals = (meshToFit: any, bounds: any) => {
-      const scene = this.scene;
-      const size = new Vector3(
-        bounds.maximum.x - bounds.minimum.x,
-        bounds.maximum.y - bounds.minimum.y,
-        bounds.maximum.z - bounds.minimum.z
-      );
-      const boundsTestCube = MeshBuilder.CreateBox(
-        'boundsBox',
-        {
-          width: size.x,
-          height: size.y,
-          depth: size.z,
-        },
-        scene
-      );
+    setInterval(() => {
+      console.log(this.carRoot?.rotationQuaternion?.toEulerAngles());
+    }, 1000);
 
-      boundsTestCube.position.x = bounds.minimum.x + size.x / 2;
-      boundsTestCube.position.y = bounds.minimum.y + size.y / 2;
-      boundsTestCube.position.z = bounds.minimum.z + size.z / 2;
+    this.carRoot!.rotation = new Vector3(0, 0, 0);
+    const yaw = getCarRotation(bounds);
+    if (yaw) {
+      console.log(yaw);
+      this.carRoot!.rotate(Axis.Y, yaw, Space.WORLD);
+    }
 
-      boundsTestCube.material = new StandardMaterial('boundsBoxMat', scene);
-
-      boundsTestCube.material.alpha = 0;
-      boundsTestCube.showBoundingBox = true;
-    };
-
-    const getSizeFromBounds = (bounds: BoundingBox): Vector3 => {
-      const size = new Vector3(
-        bounds.maximum.x - bounds.minimum.x,
-        bounds.maximum.y - bounds.minimum.y,
-        bounds.maximum.z - bounds.minimum.z
-      );
-
-      return size;
-    };
-
-    const getParentSize = (parent: any): Vector3 => {
-      const sizes = parent.getHierarchyBoundingVectors();
-      const size = {
-        x: sizes.max.x - sizes.min.x,
-        y: sizes.max.y - sizes.min.y,
-        z: sizes.max.z - sizes.min.z,
-      };
-      return new Vector3(size.x, size.y, size.z);
-    };
-
-    // Debug
-    createTestBoundsVisuals(undefined, bounds);
-
-    const meshBoundingBox = (this.carRoot as TransformNode).getHierarchyBoundingVectors();
+    // Debug, TODO Remove later
+    if (!environment.production) createTestBoundsVisuals(bounds, this.scene);
 
     const targetSize = getSizeFromBounds(bounds);
-
-    const currentSize = getParentSize(this.carRoot);
-
+    const currentSize = getSizeFromNode(this.carRoot!);
     const relation = targetSize.divide(currentSize);
 
     // Get min value from size, car should always scaled in all 3 axes the same amout
@@ -421,8 +382,8 @@ export class App {
 
   private enterXR(): void {
     this.scene.getMeshByName('hdrSkyBox')?.dispose();
-    //this.scene.environmentTexture?.dispose();
     this.carRoot?.setEnabled(false);
+    this.ground.setEnabled(false);
   }
 
   private laveXR(): void {
@@ -430,10 +391,12 @@ export class App {
   }
 
   public startRender(): void {
-    this.engine.runRenderLoop(() => {
-      this.scene.render();
-      this.fps = this.engine.getFps().toFixed();
-    });
+    this.ngZone.runOutsideAngular(() =>
+      this.engine.runRenderLoop(() => {
+        this.scene.render();
+        this.fps = this.engine.getFps().toFixed();
+      })
+    );
   }
 
   public stopRender(): void {

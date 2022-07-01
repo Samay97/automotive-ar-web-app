@@ -1,4 +1,4 @@
-import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial } from '@babylonjs/core';
+import { BoundingBox, Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Vector3 } from '@babylonjs/core';
 
 const getMaterial = (materialName: string, color: string, scene: Scene): StandardMaterial => {
   let material = scene.getMaterialByName(materialName) as StandardMaterial;
@@ -37,4 +37,37 @@ export const buildConeMesh = (scene: Scene, color = '#3AAFA9'): Mesh => {
   cone.material = getMaterial('coneMaterial', color, scene);
   cone.isVisible = true;
   return cone;
+};
+
+/**
+ * Create bound box for debug purpose
+ * @param bounds
+ * @param scene
+ */
+export const createTestBoundsVisuals = (bounds: BoundingBox, scene: Scene): Mesh => {
+  const size = new Vector3(
+    bounds.maximum.x - bounds.minimum.x,
+    bounds.maximum.y - bounds.minimum.y,
+    bounds.maximum.z - bounds.minimum.z
+  );
+
+  const boundsTestCube = MeshBuilder.CreateBox(
+    'boundsBox',
+    {
+      width: size.x,
+      height: size.y,
+      depth: size.z,
+    },
+    scene
+  );
+
+  boundsTestCube.position.x = bounds.minimum.x + size.x / 2;
+  boundsTestCube.position.y = bounds.minimum.y + size.y / 2;
+  boundsTestCube.position.z = bounds.minimum.z + size.z / 2;
+
+  boundsTestCube.material = new StandardMaterial('boundsBoxMat', scene);
+  boundsTestCube.material.alpha = 0;
+  boundsTestCube.showBoundingBox = true;
+
+  return boundsTestCube;
 };
