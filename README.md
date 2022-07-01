@@ -8,6 +8,13 @@ Bachelor Thesis Samuel Knoch
 Demo at [automotive-ar-web-app.web.app](https://automotive-ar-web-app.web.app) available!
 
 
+## Requirements
+
+- Chrome latest
+- Chrome activate Flag [chrome://flags](chrome://flags) WebXR Incubations
+
+
+
 ## Development setup
 
 Install the Angular CLI globally:
