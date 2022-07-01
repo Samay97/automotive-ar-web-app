@@ -1,5 +1,4 @@
 import {
-  ArcRotateCamera,
   Engine,
   IWebXRAnchor,
   IWebXRHitResult,
@@ -29,9 +28,6 @@ import {
   HemisphericLight,
   Matrix,
   BoundingBox,
-  Node,
-  DefaultRenderingPipeline,
-  Xbox360Pad,
   Space,
   Axis,
 } from '@babylonjs/core';
@@ -39,12 +35,10 @@ import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { NgZone } from '@angular/core';
 import { XRSession } from './xr-session';
-import * as earcut from 'earcut';
-(window as any).earcut = earcut;
 import '@babylonjs/loaders/glTF';
 import { ShadowOnlyMaterial } from '@babylonjs/materials';
 import { getCarRotation, getCenterOfVectors, getSizeFromBounds, getSizeFromNode } from './helper/vector';
-import { buildBoxMesh, buildConeMesh, createTestBoundsVisuals } from './helper/mesh';
+import { buildBoxMesh, createTestBoundsVisuals } from './helper/mesh';
 import { setupArcRotateCamera } from './helper/scene';
 import { environment } from 'src/environments/environment';
 
@@ -269,28 +263,6 @@ export class App {
     (this.cursor.material! as StandardMaterial).roughness = 1;
     (this.cursor.material! as StandardMaterial).alpha = 0.5;
 
-    // Car
-    SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/porsche_4s.glb', undefined, this.scene).then(
-      (result: ISceneLoaderAsyncResult) => {
-        let carRoot: TransformNode | AbstractMesh | undefined = result.transformNodes.find(
-          (el) => el.name === 'Sketchfab_model'
-        );
-        if (!carRoot) carRoot = result.meshes.find((el) => el.name === 'Sketchfab_model');
-        if (carRoot) {
-          this.carRoot = carRoot;
-          carRoot.position.y += 0.025; // fix rims under shadow plane on zero
-          carRoot.scaling = new Vector3(1, 1, 1);
-          console.log('loaded - Car');
-
-          if (this.shadowGenerator) {
-            result.meshes.forEach((mesh: AbstractMesh) => {
-              this.shadowGenerator.getShadowMap()?.renderList?.push(mesh);
-            });
-          }
-        }
-      }
-    );
-
     // Ground
     const shadowMaterial = new ShadowOnlyMaterial('shadowOnly', this.scene);
     this.ground = MeshBuilder.CreateGround('ground', { width: 10, height: 10 }, this.scene);
@@ -301,9 +273,9 @@ export class App {
     this.ground.visibility = 0;
 
     // HDR
-    const hdrTexture = CubeTexture.CreateFromPrefilteredData('assets/environment.env', this.scene);
+    const hdrTexture = CubeTexture.CreateFromPrefilteredData('assets/env/autumn_forest.env', this.scene);
     this.scene.environmentTexture = hdrTexture;
-    const skybox = this.scene.createDefaultSkybox(hdrTexture, true, 80, 0.3);
+    const skybox = this.scene.createDefaultSkybox(hdrTexture, true, 80, 0.25);
   }
 
   private registerWindowEvents(): void {
@@ -388,6 +360,31 @@ export class App {
 
   private laveXR(): void {
     // TODO
+  }
+
+  public async loadCar(url: string = 'assets/gtr.glb'): Promise<void> {
+    const result: ISceneLoaderAsyncResult = await SceneLoader.ImportMeshAsync(
+      'Sketchfab_model',
+      url,
+      undefined,
+      this.scene
+    );
+
+    let carRoot: TransformNode | AbstractMesh | undefined = result.transformNodes.find(
+      (el) => el.name === 'Sketchfab_model'
+    );
+    if (!carRoot) carRoot = result.meshes.find((el) => el.name === 'Sketchfab_model');
+    if (carRoot) {
+      this.carRoot = carRoot;
+      carRoot.position.y += 0.025; // fix rims under shadow plane on zero
+      console.log('loaded - Car');
+
+      if (this.shadowGenerator) {
+        result.meshes.forEach((mesh: AbstractMesh) => {
+          this.shadowGenerator.getShadowMap()?.renderList?.push(mesh);
+        });
+      }
+    }
   }
 
   public startRender(): void {
