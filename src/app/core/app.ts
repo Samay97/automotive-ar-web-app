@@ -30,6 +30,11 @@ import {
   EventState,
   ShadowGenerator,
   GroundMesh,
+  WebXRBackgroundRemover,
+  DirectionalLight,
+  HemisphericLight,
+  Matrix,
+  BoundingBox,
 } from '@babylonjs/core';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -39,6 +44,9 @@ import * as earcut from 'earcut';
 (window as any).earcut = earcut;
 import '@babylonjs/loaders/glTF';
 import { ShadowOnlyMaterial } from '@babylonjs/materials';
+import { Light } from '@babylonjs/inspector/stories/Icon.stories';
+import { calculateCenterOfVectors } from './helper/vector';
+import { buildBoxMesh, buildConeMesh } from './helper/mesh';
 
 const sessionMode = 'immersive-ar';
 
@@ -111,6 +119,7 @@ export class App {
     this.addAnchorSystem();
     this.addHitTest();
     this.addLightEstimation();
+    this.addBackroundRemover();
 
     xr.baseExperience.onStateChangedObservable.add((state) => {
       switch (state) {
@@ -161,15 +170,15 @@ export class App {
     ) as WebXRAnchorSystem;
 
     this.anchorSystem.onAnchorAddedObservable.add((newAnchor: IWebXRAnchor) => {
-      const box = this.buildAnchorMesh();
+      const box = buildBoxMesh(this.scene, '#3AAFA8');
       const rotationQuaternion = box.rotationQuaternion ?? undefined;
       newAnchor.transformationMatrix.decompose(undefined, rotationQuaternion, box.position);
-      box.position.y += 0.1 / 2;
+      box.position.y += box.position.y / 2; // center of box is used as position, box shoud be on surface
 
       this.allAnchors.set(newAnchor.id, newAnchor);
       this.anchorMeshs.set(newAnchor.id, box);
 
-      if (this.allAnchors.size === 4) {
+      if (this.allAnchors.size === 2) {
         this.placeCar();
       }
     });
@@ -191,6 +200,15 @@ export class App {
     });
   }
 
+  private addBackroundRemover(): WebXRBackgroundRemover {
+    return this.featureManager.enableFeature(WebXRBackgroundRemover.Name, 'latest', {
+      environmentHelperRemovalFlags: {
+        skyBox: true,
+        ground: false,
+      },
+    }) as WebXRBackgroundRemover;
+  }
+
   private onHitResult(results: IWebXRHitResult[]): void {
     if (results.length && this.cursor) {
       this.hitTestResult = results[0];
@@ -201,6 +219,21 @@ export class App {
       this.cursor.isVisible = false;
       this.hitTestResult = null;
     }
+  }
+
+  // Debug
+  private testLight(): void {
+    const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
+
+    // Default intensity is 1. Let's dim the light a small amount
+    light.intensity = 0.7;
+
+    const dirLight = new DirectionalLight('light dir', new Vector3(0, -1, -0.5), this.scene);
+    dirLight.position = new Vector3(0, 5, -5);
+
+    this.shadowGenerator = new ShadowGenerator(1024 * 2, dirLight);
+    this.shadowGenerator.useBlurExponentialShadowMap = true;
+    this.shadowGenerator.blurKernel = 32;
   }
 
   private addLightEstimation(): void {
@@ -218,41 +251,34 @@ export class App {
     ) as WebXRLightEstimation;
 
     if (this.lightSystem.directionalLight) {
-      console.log('SHadow gen');
+      this.lightSystem.directionalLight.intensity = 1;
+      console.log('Shadow generated');
+      this.lightSystem.directionalLight.shadowMinZ = 3;
+      this.lightSystem.directionalLight.shadowMaxZ = 8;
       this.shadowGenerator = new ShadowGenerator(1024, this.lightSystem.directionalLight);
       this.shadowGenerator.useBlurExponentialShadowMap = true;
-      this.shadowGenerator.useKernelBlur = true;
-      this.shadowGenerator.blurKernel = 40;
+      if (this.ground && this.ground.material)
+        (this.ground.material as ShadowOnlyMaterial).activeLight = this.lightSystem.directionalLight;
       this.shadowGenerator.setDarkness(0.2);
     }
 
+    /*
     this.lightSystem.onReflectionCubeMapUpdatedObservable.add((eventData: BaseTexture, eventState: EventState) => {
       console.log(eventData);
       console.log(this.lightSystem.directionalLight?.intensity);
     });
-  }
-
-  private buildAnchorMesh(): Mesh {
-    // const box = MeshBuilder.CreateCapsule('box', { radius: 0.01, tessellation: 16, height: 1 }, this.scene);
-    const box = MeshBuilder.CreateBox('box', { size: 0.1 }, this.scene);
-    const boxMaterial = new StandardMaterial('boxMaterial', this.scene);
-    boxMaterial.diffuseColor = Color3.FromHexString('#5853e6');
-    box.material = boxMaterial;
-    box.isVisible = true;
-    return box;
+    */
   }
 
   private buildScene(): void {
-    // Reticle
-    this.cursor = MeshBuilder.CreateDisc('reticle', { radius: 0.05 }, this.scene);
-    const reticleMaterial = new StandardMaterial('reticleMaterial', this.scene);
-    reticleMaterial.diffuseColor = Color3.FromHexString('#FFFFFF');
-    reticleMaterial.roughness = 1;
-    this.cursor.material = reticleMaterial;
+    // Cursor
+    this.cursor = buildBoxMesh(this.scene);
     this.cursor.isVisible = false;
+    (this.cursor.material! as StandardMaterial).roughness = 1;
+    (this.cursor.material! as StandardMaterial).alpha = 0.5;
 
     // Car
-    SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/gtr.glb', undefined, this.scene).then(
+    SceneLoader.ImportMeshAsync('Sketchfab_model', 'assets/porsche_4s.glb', undefined, this.scene).then(
       (result: ISceneLoaderAsyncResult) => {
         let carRoot: TransformNode | AbstractMesh | undefined = result.transformNodes.find(
           (el) => el.name === 'Sketchfab_model'
@@ -260,9 +286,8 @@ export class App {
         if (!carRoot) carRoot = result.meshes.find((el) => el.name === 'Sketchfab_model');
         if (carRoot) {
           this.carRoot = carRoot;
-          carRoot.position.y += 0.0045; // fix rims under shadow plane on zero
+          carRoot.position.y += 0.025; // fix rims under shadow plane on zero
           carRoot.scaling = new Vector3(1, 1, 1);
-          // carRoot.setPivotMatrix(Matrix.Translation(0,1,0), false); // set pivot to center of car
           console.log('loaded - Car');
 
           if (this.shadowGenerator) {
@@ -276,7 +301,7 @@ export class App {
 
     // Ground
     const shadowMaterial = new ShadowOnlyMaterial('shadowOnly', this.scene);
-    this.ground = MeshBuilder.CreateGround('ground', { width: 30, height: 30 }, this.scene);
+    this.ground = MeshBuilder.CreateGround('ground', { width: 2, height: 2 }, this.scene);
     this.ground.receiveShadows = true;
     this.ground.material = shadowMaterial;
 
@@ -300,36 +325,102 @@ export class App {
   }
 
   private placeCar(): void {
-    let totalX = 0;
-    let totalZ = 0;
-    let totalY = 0;
+    if (!this.carRoot) return;
 
-    this.allAnchors.forEach((anchor: IWebXRAnchor, key: string) => {
-      const rotation = new Quaternion();
-      const translation = new Vector3();
-      anchor.transformationMatrix.decompose(undefined, rotation, translation);
+    const transformationMatrix: Matrix[] = Array.from<IWebXRAnchor>(this.allAnchors.values()).map(
+      (el) => el.transformationMatrix
+    );
+    const point = calculateCenterOfVectors(transformationMatrix);
 
-      totalX += translation.x;
-      totalZ += translation.z;
-      totalY += translation.y;
-    });
-
-    const centerX = totalX / this.allAnchors.size;
-    const centerZ = totalZ / this.allAnchors.size;
-    const centerY = totalY / this.allAnchors.size;
-    this.carRoot?.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
+    this.carRoot?.setAbsolutePosition(point);
     this.carRoot?.setEnabled(true);
     this.carPlaced = true;
     console.log('Car position updated');
 
+    const anchors = Array.from<AbstractMesh>(this.anchorMeshs.values());
+    this.carRoot.scaling = this.getCarScaleRelativeToAnchros(
+      point,
+      anchors.map((el: AbstractMesh) => el.position)
+    );
+    console.log('Car Scale updated');
+
     // Update ground for shadow
-    this.ground.setAbsolutePosition(new Vector3(centerX, centerY, centerZ));
+    this.ground.setAbsolutePosition(point);
 
     // Reset all anchor and helper meshes
-    this.anchorMeshs.forEach((anchor: AbstractMesh) => anchor.setEnabled(false));
+    this.anchorMeshs.forEach((anchor: AbstractMesh) => anchor.dispose());
     this.hitTestSystem.onHitTestResultObservable.removeCallback(this.onHitResult, this);
     this.cursor.dispose();
     this.hitTestResult = null;
+  }
+
+  private getCarScaleRelativeToAnchros(center: Vector3, anchorPositions: Vector3[]): Vector3 {
+    if (!anchorPositions || anchorPositions.length !== 2)
+      throw Error('anchorPosition missing for getCarScaleRelativeToAnchros');
+
+    const bounds = new BoundingBox(anchorPositions[0], anchorPositions[1]);
+
+    const createTestBoundsVisuals = (meshToFit: any, bounds: any) => {
+      const scene = this.scene;
+      const size = new Vector3(
+        bounds.maximum.x - bounds.minimum.x,
+        bounds.maximum.y - bounds.minimum.y,
+        bounds.maximum.z - bounds.minimum.z
+      );
+      const boundsTestCube = MeshBuilder.CreateBox(
+        'boundsBox',
+        {
+          width: size.x,
+          height: size.y,
+          depth: size.z,
+        },
+        scene
+      );
+
+      boundsTestCube.position.x = bounds.minimum.x + size.x / 2;
+      boundsTestCube.position.y = bounds.minimum.y + size.y / 2;
+      boundsTestCube.position.z = bounds.minimum.z + size.z / 2;
+
+      boundsTestCube.material = new StandardMaterial('boundsBoxMat', scene);
+
+      boundsTestCube.material.alpha = 0;
+      boundsTestCube.showBoundingBox = true;
+    };
+
+    const getSizeFromBounds = (bounds: BoundingBox): Vector3 => {
+      const size = new Vector3(
+        bounds.maximum.x - bounds.minimum.x,
+        bounds.maximum.y - bounds.minimum.y,
+        bounds.maximum.z - bounds.minimum.z
+      );
+
+      return size;
+    };
+
+    const getParentSize = (parent: any): Vector3 => {
+      const sizes = parent.getHierarchyBoundingVectors();
+      const size = {
+        x: sizes.max.x - sizes.min.x,
+        y: sizes.max.y - sizes.min.y,
+        z: sizes.max.z - sizes.min.z,
+      };
+      return new Vector3(size.x, size.y, size.z);
+    };
+
+    // Debug
+    createTestBoundsVisuals(undefined, bounds);
+
+    const meshBoundingBox = (this.carRoot as TransformNode).getHierarchyBoundingVectors();
+
+    const targetSize = getSizeFromBounds(bounds);
+
+    const currentSize = getParentSize(this.carRoot);
+
+    const relation = targetSize.divide(currentSize);
+
+    // Get min value from size, car should always scaled in all 3 axes the same amout
+    const min = Math.min(Math.abs(relation.x), Math.abs(relation.z)); // sz.y is not required we only need space in x and z height of object will be as it is
+    return new Vector3(min, min, min);
   }
 
   private async initPlaneDetector(
