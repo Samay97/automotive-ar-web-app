@@ -9,5 +9,6 @@ export const setupArcRotateCamera = (scene: Scene, canvas: HTMLCanvasElement): A
   camera.beta = 1.2;
   camera.alpha = 1.13;
   camera.radius = 6;
+  camera.upperBetaLimit = 1.34;
   return camera;
 };

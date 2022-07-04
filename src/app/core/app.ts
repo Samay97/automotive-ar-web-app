@@ -211,30 +211,30 @@ export class App {
   }
 
   private addLightEstimation(): void {
+    /*
+    const options = {
+      setSceneEnvironmentTexture: true,
+      cubeMapPollInterval: 1000,
+      createDirectionalLightSource: true,
+      reflectionFormat: 'srgba8',
+      disableCubeMapReflection: true
+    };
+    */
+
+    const options = {
+      setSceneEnvironmentTexture: true,
+      cubeMapPollInterval: 1000,
+      createDirectionalLightSource: true,
+      reflectionFormat: 'rgba16f',
+    };
+
     this.lightSystem = this.featureManager.enableFeature(
       WebXRLightEstimation.Name,
       'latest',
-      {
-        setSceneEnvironmentTexture: true,
-        cubeMapPollInterval: 1000,
-        createDirectionalLightSource: true,
-        reflectionFormat: 'rgba16f',
-      },
+      options,
       true,
       false
     ) as WebXRLightEstimation;
-
-    if (this.lightSystem.directionalLight) {
-      this.lightSystem.directionalLight.intensity = 1;
-      console.log('Shadow generated');
-      this.lightSystem.directionalLight.shadowMinZ = 3;
-      this.lightSystem.directionalLight.shadowMaxZ = 8;
-      this.shadowGenerator = new ShadowGenerator(1024, this.lightSystem.directionalLight);
-      this.shadowGenerator.useBlurExponentialShadowMap = true;
-      if (this.ground && this.ground.material)
-        (this.ground.material as ShadowOnlyMaterial).activeLight = this.lightSystem.directionalLight;
-      this.shadowGenerator.setDarkness(0.2);
-    }
 
     /*
     this.lightSystem.onReflectionCubeMapUpdatedObservable.add((eventData: BaseTexture, eventState: EventState) => {
@@ -281,11 +281,8 @@ export class App {
     // Ground
     const shadowMaterial = new ShadowOnlyMaterial('shadowOnly', this.scene);
     this.ground = MeshBuilder.CreateGround('ground', { width: 10, height: 10 }, this.scene);
-
-    // TODO: Fix shadow
-    //this.ground.receiveShadows = true;
+    this.ground.receiveShadows = true;
     this.ground.material = shadowMaterial;
-    this.ground.visibility = 0;
 
     // HDR
     const hdrTexture = CubeTexture.CreateFromPrefilteredData('assets/env/autumn_forest.env', this.scene);
@@ -320,8 +317,6 @@ export class App {
       true
     );
 
-    this.appUI.toggle(false);
-
     // Update Car
     this.carRoot.setAbsolutePosition(newPoint);
     this.carRoot.setEnabled(true);
@@ -334,6 +329,7 @@ export class App {
     this.ground.setAbsolutePosition(newPoint);
 
     // Reset all anchor and helper meshes
+    this.appUI.toggle(false);
     this.anchorMeshs.forEach((anchor: AbstractMesh) => anchor.dispose());
     this.hitTestSystem.onHitTestResultObservable.removeCallback(this.onHitResult, this);
     this.scene.onBeforeRenderObservable.removeCallback(this.onBeforeRender, this);
@@ -369,7 +365,7 @@ export class App {
     console.log('ENTERING_XR');
     this.scene.getMeshByName('hdrSkyBox')?.dispose();
     this.carRoot?.setEnabled(false);
-    this.ground.setEnabled(false);
+    // this.ground.setEnabled(false);
     this.appUI.toggle(true);
   }
 
@@ -415,10 +411,26 @@ export class App {
       carRoot.position.y += 0.025; // fix rims under shadow plane on zero
       console.log('loaded - Car');
 
-      if (this.shadowGenerator) {
-        result.meshes.forEach((mesh: AbstractMesh) => {
-          this.shadowGenerator.getShadowMap()?.renderList?.push(mesh);
+      // Add shadow
+      if (this.lightSystem.directionalLight) {
+        // this.lightSystem.directionalLight.shadowMinZ = 0.1;
+        //this.lightSystem.directionalLight.shadowMaxZ = 100;
+        const shadowGenerator = new ShadowGenerator(1024, this.lightSystem.directionalLight);
+        shadowGenerator.useBlurExponentialShadowMap = true;
+        shadowGenerator.useKernelBlur = true;
+        shadowGenerator.blurKernel = 24;
+        shadowGenerator.setDarkness(0.2);
+
+        this.carRoot!.getChildMeshes().forEach((mesh: AbstractMesh) => {
+          shadowGenerator.getShadowMap()?.renderList?.push(mesh);
         });
+
+        /*
+        if (this.ground && this.ground.material)
+          (this.ground.material as ShadowOnlyMaterial).activeLight = this.lightSystem.directionalLight;
+        // this.shadowGenerator.setDarkness(0.2);
+        */
+        console.log('Shadow generated');
       }
     }
   }
