@@ -1,3 +1,22 @@
+<div class="select-model-container" *ngIf="!carLoaded">
+    <button class="modern-button" (click)="loadCar('assets/gtr.glb')">
+        Nissan Gtr
+    </button>
+
+    <button class="modern-button" (click)="loadCar('assets/porsche_4s.glb')">
+        Porsche 4s
+    </button>
+</div>
+
+<div class="select-model-container" *ngIf="loading">
+    <div id="boxes">
+        <div class="box gray"></div>
+        <div class="box cyan"></div>
+        <div class="box orange"></div>
+        <div class="box white"></div>
+    </div> 
+</div>
+
 <div class="fps">{{fps}} FPS</div>
 <canvas #canvas></canvas>
 <!--<button class="enterbutton" (click)="enterXR()">Enter</button>-->

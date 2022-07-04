@@ -10,9 +10,8 @@ Demo at [automotive-ar-web-app.web.app](https://automotive-ar-web-app.web.app) a
 
 ## Requirements
 
-- Chrome latest
+- Chrome 81 or newer
 - Chrome activate Flag [chrome://flags](chrome://flags) WebXR Incubations
-
 
 
 ## Development setup

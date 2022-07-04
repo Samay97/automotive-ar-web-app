@@ -1,6 +1,3 @@
-import { WebXRFeaturesManager } from '@babylonjs/core';
-import { lensFlarePixelShader } from '@babylonjs/core/Shaders/lensFlare.fragment';
-
 export enum DeviceSupport {
   ALL = 'all',
   WITHOUTEXPERIMENTAL = 'without experimental',

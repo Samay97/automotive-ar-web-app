@@ -3,18 +3,9 @@ canvas
   height: 100%
   touch-action: none
 
-.enterbutton
-  position: absolute
-  right: 1rem
-  bottom: 3rem
-  border: none
-  z-index: 9999
-  width: 10rem
-  height: 4rem
-
 .fps
   position: absolute
-  background-color: black
+  background-color: hsl(0, 0, 10)
   border: 2px solid red
   text-align: center
   font-size: 16px
@@ -23,4 +14,50 @@ canvas
   right: 10px
   width: 70px
   height: 20px
-            
+
+.select-model-container
+  position: absolute
+  width: 100%
+  height: 100%
+  background-color: hsl(0, 0, 10)
+  z-index: 99999
+  display: flex
+  justify-content: center
+  flex-direction: column
+  padding: 3rem
+  top: 0
+
+#boxes 
+  text-align: center
+
+#btns
+  padding: 25px
+  background: white
+  margin-bottom: 40px
+
+#btns button
+  background: white
+  padding: 5px 10px
+  border: 0px
+
+#btns .fa
+  font-size: 30px
+  color: #0078D7
+
+.box 
+  position: relative
+  width: 60px
+  height: 60px
+  margin: 4px
+  display: inline-block
+
+.gray 
+  background-color: #8a9ba6
+.cyan 
+  background-color: #287094
+.orange 
+  background-color: #f58800
+.white 
+  background-color: #ffffff
+
+// #8a9ba6 gray

@@ -1,4 +1,14 @@
-import { BoundingBox, Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Vector3 } from '@babylonjs/core';
+import {
+  BoundingBox,
+  Color3,
+  Color4,
+  LinesMesh,
+  Mesh,
+  MeshBuilder,
+  Scene,
+  StandardMaterial,
+  Vector3,
+} from '@babylonjs/core';
 
 const getMaterial = (materialName: string, color: string, scene: Scene): StandardMaterial => {
   let material = scene.getMaterialByName(materialName) as StandardMaterial;
@@ -70,4 +80,35 @@ export const createTestBoundsVisuals = (bounds: BoundingBox, scene: Scene): Mesh
   boundsTestCube.showBoundingBox = true;
 
   return boundsTestCube;
+};
+
+/**
+ * Create a line based on points
+ * @param scene
+ * @param name
+ * @param color
+ * @param points
+ * @returns
+ */
+export const buildLineMesh = (scene: Scene, points: Vector3[], name = 'cursorLines', color = '#3AAFA9'): LinesMesh => {
+  const line = MeshBuilder.CreateLines('cursorLines', { points, updatable: true }, scene);
+  line.color = Color3.FromHexString(color);
+  line.alwaysSelectAsActiveMesh = true; // Prevent the line from being rendered during large movements in the scene
+  return line;
+};
+
+/**
+ * Update a specific line
+ * @param line
+ * @param points
+ * @returns
+ */
+export const updateLineMesh = (line: LinesMesh, points: Vector3[]): LinesMesh => {
+  const options = {
+    instance: line,
+    points: points,
+    updatable: true,
+  };
+  const newLine = MeshBuilder.CreateLines(line.name, options);
+  return newLine;
 };
