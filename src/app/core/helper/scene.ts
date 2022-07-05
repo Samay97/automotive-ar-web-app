@@ -4,6 +4,7 @@ import {
   Scene,
   SceneOptimizer,
   SceneOptimizerOptions,
+  TextureOptimization,
   Vector3,
 } from '@babylonjs/core';
 
@@ -25,6 +26,7 @@ export const setupArcRotateCamera = (scene: Scene, canvas: HTMLCanvasElement): A
 export const addSceneOptimizer = (scene: Scene) => {
   const options = new SceneOptimizerOptions(45, 2000);
   options.addOptimization(new HardwareScalingOptimization(0, 1.5, 0.25));
+  options.addOptimization(new TextureOptimization(1, 1024));
 
   // Optimizer
   const optimizer = new SceneOptimizer(scene, options);
