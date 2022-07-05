@@ -1,4 +1,12 @@
-import { ArcRotateCamera, Scene, Vector3 } from '@babylonjs/core';
+import {
+  ArcRotateCamera,
+  HardwareScalingOptimization,
+  Scene,
+  SceneOptimizer,
+  SceneOptimizerOptions,
+  TextureOptimization,
+  Vector3,
+} from '@babylonjs/core';
 
 export const setupArcRotateCamera = (scene: Scene, canvas: HTMLCanvasElement): ArcRotateCamera => {
   const camera = new ArcRotateCamera('camera', 0, 0, 5, Vector3.Zero(), scene);
@@ -13,4 +21,14 @@ export const setupArcRotateCamera = (scene: Scene, canvas: HTMLCanvasElement): A
   camera.radius = 6;
   camera.upperBetaLimit = 1.34;
   return camera;
+};
+
+export const addSceneOptimizer = (scene: Scene) => {
+  const options = new SceneOptimizerOptions(45, 2000);
+  options.addOptimization(new HardwareScalingOptimization(0, 1.5, 0.25));
+  options.addOptimization(new TextureOptimization(1, 1024));
+
+  // Optimizer
+  const optimizer = new SceneOptimizer(scene, options);
+  optimizer.start();
 };

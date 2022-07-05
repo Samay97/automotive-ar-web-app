@@ -24,7 +24,6 @@ import {
   ShadowGenerator,
   GroundMesh,
   WebXRBackgroundRemover,
-  DirectionalLight,
   HemisphericLight,
   Matrix,
   BoundingBox,
@@ -32,17 +31,17 @@ import {
   Axis,
   LinesMesh,
 } from '@babylonjs/core';
+import { ShadowOnlyMaterial } from '@babylonjs/materials';
 import { fromEvent, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { NgZone } from '@angular/core';
-import { XRSession } from './xr-session';
 import '@babylonjs/loaders/glTF';
-import { ShadowOnlyMaterial } from '@babylonjs/materials';
-import { getCarRotation, getCenterOfVectors, getSizeFromBounds, getSizeFromNode } from './helper/vector';
-import { buildBoxMesh, buildLineMesh, createTestBoundsVisuals, updateLineMesh } from './helper/mesh';
-import { setupArcRotateCamera } from './helper/scene';
-import { environment } from 'src/environments/environment';
+
+import { XRSession } from './xr-session';
 import { GUI } from './gui';
+import { getCarRotation, getCenterOfVectors, getSizeFromBounds, getSizeFromNode } from './helper/vector';
+import { buildBoxMesh, buildLineMesh, updateLineMesh } from './helper/mesh';
+import { addSceneOptimizer, setupArcRotateCamera } from './helper/scene';
 
 const sessionMode = 'immersive-ar';
 
@@ -59,7 +58,6 @@ export class App {
   private hitTestSystem!: WebXRHitTest;
   private anchorSystem!: WebXRAnchorSystem;
   private lightSystem!: WebXRLightEstimation;
-  private shadowGenerator!: ShadowGenerator;
 
   // Anchors with mesh and debug line
   private allAnchors = new Map<number, IWebXRAnchor>();
@@ -78,6 +76,7 @@ export class App {
 
   constructor(canvas: HTMLCanvasElement, private ngZone: NgZone) {
     this.engine = new Engine(canvas, true);
+    this.engine.setHardwareScalingLevel(0.5);
     this.scene = new Scene(this.engine);
     this.appUI = new GUI(this.scene);
     this.registerWindowEvents();
@@ -210,16 +209,6 @@ export class App {
   }
 
   private addLightEstimation(): void {
-    /*
-    const options = {
-      setSceneEnvironmentTexture: true,
-      cubeMapPollInterval: 1000,
-      createDirectionalLightSource: true,
-      reflectionFormat: 'srgba8',
-      disableCubeMapReflection: true
-    };
-    */
-
     const options = {
       setSceneEnvironmentTexture: true,
       cubeMapPollInterval: 1000,
@@ -234,13 +223,6 @@ export class App {
       true,
       false
     ) as WebXRLightEstimation;
-
-    /*
-    this.lightSystem.onReflectionCubeMapUpdatedObservable.add((eventData: BaseTexture, eventState: EventState) => {
-      console.log(eventData);
-      console.log(this.lightSystem.directionalLight?.intensity);
-    });
-    */
   }
 
   private onHitResult(results: IWebXRHitResult[]): void {
@@ -253,21 +235,6 @@ export class App {
       this.cursor.isVisible = false;
       this.hitTestResult = null;
     }
-  }
-
-  // Debug
-  private testLight(): void {
-    const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
-
-    // Default intensity is 1. Let's dim the light a small amount
-    light.intensity = 0.7;
-
-    const dirLight = new DirectionalLight('light dir', new Vector3(0, -1, -0.5), this.scene);
-    dirLight.position = new Vector3(0, 5, -5);
-
-    this.shadowGenerator = new ShadowGenerator(1024 * 2, dirLight);
-    this.shadowGenerator.useBlurExponentialShadowMap = true;
-    this.shadowGenerator.blurKernel = 32;
   }
 
   private buildScene(): void {
@@ -349,9 +316,6 @@ export class App {
       this.carRoot!.rotate(Axis.Y, yaw, Space.WORLD);
     }
 
-    // Debug, TODO Remove later
-    // if (!environment.production) createTestBoundsVisuals(bounds, this.scene);
-
     const targetSize = getSizeFromBounds(bounds);
     const currentSize = getSizeFromNode(this.carRoot!);
     const relation = targetSize.divide(currentSize);
@@ -365,7 +329,6 @@ export class App {
     console.log('ENTERING_XR');
     this.scene.getMeshByName('hdrSkyBox')?.dispose();
     this.carRoot?.setEnabled(false);
-    // this.ground.setEnabled(false);
     this.appUI.toggle(true);
   }
 
@@ -417,10 +380,14 @@ export class App {
         shadowGenerator.useKernelBlur = true;
         shadowGenerator.blurKernel = 18;
         shadowGenerator.setDarkness(0.2);
+        this.lightSystem.directionalLight.intensity = 0.8;
+        const light = new HemisphericLight('hemi-light', new Vector3(0, 1, -1), this.scene);
 
         this.carRoot!.getChildMeshes().forEach((mesh: AbstractMesh) => {
           shadowGenerator.getShadowMap()?.renderList?.push(mesh);
         });
+
+        addSceneOptimizer(this.scene);
 
         console.log('Shadow generated');
       }
