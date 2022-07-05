@@ -65,7 +65,6 @@ export class App {
   private allAnchors = new Map<number, IWebXRAnchor>();
   private anchorMeshs = new Map<number, AbstractMesh>();
   private anchorLinePath: Vector3[] = [];
-  private anchorLineLength: number = 0;
 
   // Scene Meshes
   private carRoot: TransformNode | AbstractMesh | undefined;
@@ -118,7 +117,7 @@ export class App {
     this.addLightEstimation();
     this.addBackroundRemover();
 
-    xr.baseExperience.onStateChangedObservable.add((state) => {
+    xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
       switch (state) {
         case WebXRState.IN_XR:
           console.log('IN_XR');
@@ -389,7 +388,6 @@ export class App {
 
   private updateAnchorLenght(): void {
     if (this.anchorLinePath.length !== 2) return;
-    this.anchorLineLength = Vector3.Distance(this.anchorLinePath[0], this.anchorLinePath[1]);
     const scale = this.getCarScaleRelativeToAnchros([...this.anchorLinePath]);
     this.appUI.updateText('Footer', `Car Scale would be ${(scale.x * 100).toFixed(2)}%`);
   }
@@ -413,23 +411,16 @@ export class App {
 
       // Add shadow
       if (this.lightSystem.directionalLight) {
-        // this.lightSystem.directionalLight.shadowMinZ = 0.1;
-        //this.lightSystem.directionalLight.shadowMaxZ = 100;
         const shadowGenerator = new ShadowGenerator(1024, this.lightSystem.directionalLight);
         shadowGenerator.useBlurExponentialShadowMap = true;
         shadowGenerator.useKernelBlur = true;
-        shadowGenerator.blurKernel = 24;
+        shadowGenerator.blurKernel = 18;
         shadowGenerator.setDarkness(0.2);
 
         this.carRoot!.getChildMeshes().forEach((mesh: AbstractMesh) => {
           shadowGenerator.getShadowMap()?.renderList?.push(mesh);
         });
 
-        /*
-        if (this.ground && this.ground.material)
-          (this.ground.material as ShadowOnlyMaterial).activeLight = this.lightSystem.directionalLight;
-        // this.shadowGenerator.setDarkness(0.2);
-        */
         console.log('Shadow generated');
       }
     }
