@@ -333,6 +333,7 @@ export class App {
     this.hitTestSystem.onHitTestResultObservable.removeCallback(this.onHitResult, this);
     this.scene.onBeforeRenderObservable.removeCallback(this.onBeforeRender, this);
     this.cursor.dispose();
+    this.lineAnchors.dispose();
     this.hitTestResult = null;
   }
 
