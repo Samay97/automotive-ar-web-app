@@ -7,12 +7,18 @@
         Porsche 4s
     </button>
 
-    <button class="modern-button" (click)="loadCar('assets/porsche_930_Turbo.glb')">
+    <button class="modern-button" (click)="loadCar('assets/porsche_930_Turbo_small.glb')">
         Porsche 930 Turbo
     </button>
 </div>
 
-<div class="select-model-container" *ngIf="loading">
+<div class="error-container" *ngIf="error">
+    <h2>
+        Sorry your device is not supported
+    </h2>
+</div>
+
+<div class="select-model-container" *ngIf="loading && !error">
     <div id="boxes">
         <div class="box gray"></div>
         <div class="box cyan"></div>
