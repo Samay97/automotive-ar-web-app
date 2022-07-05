@@ -327,7 +327,6 @@ export class App {
 
   private enterXR(): void {
     console.log('ENTERING_XR');
-    this.engine.setHardwareScalingLevel(1); // Avoid bad performance in AR
     this.scene.getMeshByName('hdrSkyBox')?.dispose();
     this.carRoot?.setEnabled(false);
     this.appUI.toggle(true);

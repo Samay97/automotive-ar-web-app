@@ -31,8 +31,4 @@ export const addSceneOptimizer = (scene: Scene) => {
   // Optimizer
   const optimizer = new SceneOptimizer(scene, options);
   optimizer.start();
-
-  setTimeout(() => {
-    optimizer.stop();
-  }, 10000);
 };
