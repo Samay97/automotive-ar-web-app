@@ -22,8 +22,9 @@ export class HomeComponent implements AfterViewInit {
 
     textWrapper2.innerHTML =
       textWrapper2.textContent?.replace(/\S/g, "<span class='letter' style='display:inline-block;'>$&</span>") ?? '';
-
-    anime
+    
+    setTimeout(() => {
+      anime
       .timeline({ loop: false })
       .add({
         targets: '.c1 .line',
@@ -102,5 +103,6 @@ export class HomeComponent implements AfterViewInit {
         duration: 600,
         offset: '-=2500',
       });
+    }, 200);
   }
 }
