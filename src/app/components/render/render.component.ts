@@ -32,6 +32,10 @@ export class RenderComponent implements AfterViewInit {
     }
   }
 
+  public openInspector(): void {
+    this.app.toggleDebugger();
+  }
+
   public enterXR(): void {
     this.app.enterXRMode();
   }
@@ -68,8 +72,10 @@ export class RenderComponent implements AfterViewInit {
 
   private startRender(): void {
     this.app.startRender();
+    /*
     setInterval(() => {
       this.fps = this.app.fps;
     }, 10);
+    */
   }
 }

@@ -78,7 +78,7 @@ export class App {
 
   constructor(canvas: HTMLCanvasElement, private ngZone: NgZone) {
     this.engine = new Engine(canvas, true);
-    this.engine.setHardwareScalingLevel(0.5);
+    this.engine.setHardwareScalingLevel(1);
     this.scene = new Scene(this.engine);
     this.appUI = new GUI(this.scene);
     this.registerWindowEvents();
@@ -260,10 +260,14 @@ export class App {
 
     document.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'i' && this.scene) {
-        const debugLayer = this.scene.debugLayer;
-        debugLayer.isVisible() ? debugLayer.hide() : debugLayer.show({ handleResize: true, overlay: true });
+        this.toggleDebugger();
       }
     });
+  }
+
+  public toggleDebugger(): void {
+    const debugLayer = this.scene.debugLayer;
+    debugLayer.isVisible() ? debugLayer.hide() : debugLayer.show({ handleResize: true, overlay: true, embedMode: true });
   }
 
   private placeCar(): void {
@@ -392,7 +396,7 @@ export class App {
           shadowGenerator.getShadowMap()?.renderList?.push(mesh);
         });
 
-        addSceneOptimizer(this.scene);
+        // addSceneOptimizer(this.scene);
 
         console.log('Shadow generated');
       }
