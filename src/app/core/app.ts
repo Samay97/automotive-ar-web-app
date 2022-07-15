@@ -399,6 +399,7 @@ export class App {
         // addSceneOptimizer(this.scene);
 
         console.log('Shadow generated');
+        this.improvements();
       }
     }
   }
@@ -419,5 +420,14 @@ export class App {
   public enterXRMode(): void {
     this.enterXR();
     this.webXR?.baseExperience.enterXRAsync(sessionMode, 'local-floor').then(() => console.log('IN XR'));
+  }
+
+  private improvements(): void {
+    this.scene.freezeMaterials();
+    (this.carRoot! as TransformNode).getChildMeshes().forEach((mesh) => {
+      mesh.freezeWorldMatrix();
+      mesh.material?.freeze();
+    });
+    this.scene.blockMaterialDirtyMechanism = true;
   }
 }
