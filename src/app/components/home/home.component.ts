@@ -105,4 +105,5 @@ export class HomeComponent implements AfterViewInit {
         });
     }, 100);
   }
+
 }

@@ -399,7 +399,7 @@ export class App {
         // addSceneOptimizer(this.scene);
 
         console.log('Shadow generated');
-        this.improvements();
+        // this.improvements();
       }
     }
   }
