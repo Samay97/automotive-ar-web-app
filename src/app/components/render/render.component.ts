@@ -27,6 +27,7 @@ export class RenderComponent implements AfterViewInit {
       } catch (e: any) {
         console.error(e);
         this.error = e;
+        console.log('HERE');
       }
     }
   }

@@ -13,7 +13,7 @@ export class XRSession {
 
     /* WebXR can be used! */
     const nav: any = navigator;
-    const session = nav.xr.isSessionSupported('immersive-ar');
+    const session = await nav.xr.isSessionSupported('immersive-ar');
     if (!session) return false;
 
     /* Immersive AR can be used! */
