@@ -30,6 +30,7 @@ import {
   Space,
   Axis,
   LinesMesh,
+  DirectionalLight,
 } from '@babylonjs/core';
 import { ShadowOnlyMaterial } from '@babylonjs/materials';
 import { fromEvent, Subscription } from 'rxjs';
@@ -368,14 +369,22 @@ export class App {
       carRoot.position.y += 0.025; // fix rims under shadow plane on zero
       console.log('loaded - Car');
 
+      let dirLight: DirectionalLight;
+
+      if (!this.lightSystem) {
+        dirLight = new DirectionalLight('light', new Vector3(0, -1, 0), this.scene);
+      } else {
+        dirLight = this.lightSystem.directionalLight!;
+      }
+
       // Add shadow
-      if (this.lightSystem.directionalLight) {
-        const shadowGenerator = new ShadowGenerator(1024, this.lightSystem.directionalLight);
+      if (dirLight) {
+        const shadowGenerator = new ShadowGenerator(1024, dirLight);
         shadowGenerator.useBlurExponentialShadowMap = true;
         shadowGenerator.useKernelBlur = true;
         shadowGenerator.blurKernel = 18;
         shadowGenerator.setDarkness(0.2);
-        this.lightSystem.directionalLight.intensity = 0.8;
+        dirLight.intensity = 0.8;
         const light = new HemisphericLight('hemi-light', new Vector3(0, 1, -1), this.scene);
 
         this.carRoot!.getChildMeshes().forEach((mesh: AbstractMesh) => {
