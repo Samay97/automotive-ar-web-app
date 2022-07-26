@@ -85,27 +85,22 @@ export class App {
   }
 
   private async initXRSession(canvas: HTMLCanvasElement): Promise<void> {
-    // check if WebXR and session is available
-    if (!XRSession.checkDeviceSupport()) {
-      throw new Error('AR Session is not supported');
-    }
-
     // create camera for not immersive mode
     const camera = setupArcRotateCamera(this.scene, canvas);
+
+    // check if WebXR and session is available
+    if (!XRSession.checkDeviceSupport()) {
+      console.error('WebXR AR Session not supported');
+      return;
+    }
 
     const xr: WebXRDefaultExperience = await this.scene.createDefaultXRExperienceAsync({
       uiOptions: { sessionMode, referenceSpaceType: 'local-floor' },
     });
     this.webXR = xr;
 
-    const sessionManager: WebXRSessionManager = xr.baseExperience.sessionManager;
     const webXRCamera: WebXRCamera = xr.baseExperience.camera;
     webXRCamera.minZ = 0.1;
-
-    const isSupported = await sessionManager.isSessionSupportedAsync(sessionMode);
-    if (!isSupported) {
-      throw new Error('AR Session is not supported');
-    }
 
     const featureManager: WebXRFeaturesManager = xr.baseExperience.featuresManager;
     this.featureManager = featureManager;
