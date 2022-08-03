@@ -45,6 +45,7 @@ import { buildBoxMesh, buildLineMesh, updateLineMesh } from './helper/mesh';
 import { addSceneOptimizer, setupArcRotateCamera } from './helper/scene';
 
 const sessionMode = 'immersive-ar';
+const referenceSpaceType = 'viewer';
 
 export class App {
   private engine: Engine;
@@ -96,7 +97,7 @@ export class App {
     }
 
     const xr: WebXRDefaultExperience = await this.scene.createDefaultXRExperienceAsync({
-      uiOptions: { sessionMode, referenceSpaceType: 'local-floor' },
+      uiOptions: { sessionMode, referenceSpaceType },
     });
     this.webXR = xr;
 
