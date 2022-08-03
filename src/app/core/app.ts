@@ -278,7 +278,16 @@ export class App {
     );
     const newPoint = getCenterOfVectors(transformationMatrix);
 
+    
+
     const anchors = Array.from<AbstractMesh>(this.anchorMeshs.values());
+
+
+    console.log(anchors[0]);
+    console.log(anchors[1]);    
+    return;
+    /*
+
     const newScaling = this.getCarScaleRelativeToAnchros(
       anchors.map((el: AbstractMesh) => el.position),
       true
@@ -303,6 +312,7 @@ export class App {
     this.cursor.dispose();
     this.lineAnchors.dispose();
     this.hitTestResult = null;
+    */
   }
 
   private getCarScaleRelativeToAnchros(anchorPositions: Vector3[], rotateCar = false): Vector3 {
