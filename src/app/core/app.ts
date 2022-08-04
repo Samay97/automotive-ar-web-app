@@ -283,8 +283,8 @@ export class App {
     const anchors = Array.from<AbstractMesh>(this.anchorMeshs.values());
 
 
-    console.log(anchors[0]);
-    console.log(anchors[1]);    
+    console.log(anchors[0].position);
+    console.log(anchors[1].position);    
     return;
     /*
 
