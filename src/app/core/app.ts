@@ -98,6 +98,12 @@ export class App {
 
     const xr: WebXRDefaultExperience = await this.scene.createDefaultXRExperienceAsync({
       uiOptions: { sessionMode, referenceSpaceType },
+      outputCanvasOptions: {
+        canvasOptions: {
+            framebufferScaleFactor: 0.5,
+            antialias: false,
+        }
+      }
     });
     this.webXR = xr;
 
@@ -208,9 +214,9 @@ export class App {
   private addLightEstimation(): void {
     const options = {
       setSceneEnvironmentTexture: true,
-      cubeMapPollInterval: 2000,
+      cubeMapPollInterval: 3000,
       createDirectionalLightSource: true,
-      reflectionFormat: 'srgba8',
+      reflectionFormat: 'rgba16f',
     };
 
     this.lightSystem = this.featureManager.enableFeature(
@@ -305,8 +311,6 @@ export class App {
     this.hitTestResult = null;
     setTimeout(() => {
       this.improvements();
-      this.engine.setHardwareScalingLevel(1.5);
-      addSceneOptimizer(this.scene);
     }, 2000)
   }
 
@@ -421,7 +425,7 @@ export class App {
 
   public enterXRMode(): void {
     this.enterXR();
-    this.webXR?.baseExperience.enterXRAsync(sessionMode, 'local-floor').then(() => console.log('IN XR'));
+    this.webXR?.baseExperience.enterXRAsync(sessionMode, 'local-floor').then(() => console.log('IN XR'));    
   }
 
   private improvements(): void {

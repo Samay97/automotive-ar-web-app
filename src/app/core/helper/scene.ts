@@ -27,9 +27,9 @@ export const setupArcRotateCamera = (scene: Scene, canvas: HTMLCanvasElement): A
 
 export const addSceneOptimizer = (scene: Scene) => {
   const options = new SceneOptimizerOptions(60, 3000);
-  options.addOptimization(new HardwareScalingOptimization(1, 2, 0.25));
+  //options.addOptimization(new HardwareScalingOptimization(1, 2, 0.25));
   options.addOptimization(new TextureOptimization(1, 1024));
-  options.addOptimization(new ShadowsOptimization(2));
+  // options.addOptimization(new ShadowsOptimization(2));
   options.addOptimization(new MergeMeshesOptimization(1));
 
   // Optimizer
