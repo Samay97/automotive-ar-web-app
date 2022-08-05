@@ -396,10 +396,10 @@ export class App {
           shadowGenerator.getShadowMap()?.renderList?.push(mesh);
         });
 
-        // addSceneOptimizer(this.scene);
+        addSceneOptimizer(this.scene);
 
         console.log('Shadow generated');
-        // this.improvements();
+        this.improvements();
       }
     }
   }
