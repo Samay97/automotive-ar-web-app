@@ -45,7 +45,7 @@ import { buildBoxMesh, buildLineMesh, updateLineMesh } from './helper/mesh';
 import { addSceneOptimizer, setupArcRotateCamera } from './helper/scene';
 
 const sessionMode = 'immersive-ar';
-const referenceSpaceType = 'viewer';
+const referenceSpaceType = 'local-floor';
 
 export class App {
   private engine: Engine;
@@ -303,6 +303,10 @@ export class App {
     this.cursor.dispose();
     this.lineAnchors.dispose();
     this.hitTestResult = null;
+    setTimeout(() => {
+      this.improvements();
+      this.engine.setHardwareScalingLevel(1.2);
+    }, 2000)
   }
 
   private getCarScaleRelativeToAnchros(anchorPositions: Vector3[], rotateCar = false): Vector3 {
@@ -399,7 +403,6 @@ export class App {
         addSceneOptimizer(this.scene);
 
         console.log('Shadow generated');
-        this.improvements();
       }
     }
   }
