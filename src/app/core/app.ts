@@ -306,6 +306,7 @@ export class App {
     setTimeout(() => {
       this.improvements();
       this.engine.setHardwareScalingLevel(1.5);
+      addSceneOptimizer(this.scene);
     }, 2000)
   }
 
@@ -399,8 +400,6 @@ export class App {
         this.carRoot!.getChildMeshes().forEach((mesh: AbstractMesh) => {
           shadowGenerator.getShadowMap()?.renderList?.push(mesh);
         });
-
-        addSceneOptimizer(this.scene);
 
         console.log('Shadow generated');
       }
