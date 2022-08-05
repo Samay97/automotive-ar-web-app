@@ -208,9 +208,9 @@ export class App {
   private addLightEstimation(): void {
     const options = {
       setSceneEnvironmentTexture: true,
-      cubeMapPollInterval: 1000,
+      cubeMapPollInterval: 2000,
       createDirectionalLightSource: true,
-      reflectionFormat: 'rgba16f',
+      reflectionFormat: 'srgba8',
     };
 
     this.lightSystem = this.featureManager.enableFeature(
@@ -305,7 +305,7 @@ export class App {
     this.hitTestResult = null;
     setTimeout(() => {
       this.improvements();
-      this.engine.setHardwareScalingLevel(1.2);
+      this.engine.setHardwareScalingLevel(1.5);
     }, 2000)
   }
 
@@ -432,5 +432,6 @@ export class App {
       mesh.material?.freeze();
     });
     this.scene.blockMaterialDirtyMechanism = true;
+    this.scene.renderTargetsEnabled = false;
   }
 }
