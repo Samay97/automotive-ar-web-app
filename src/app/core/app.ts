@@ -45,7 +45,7 @@ import { buildBoxMesh, buildLineMesh, updateLineMesh } from './helper/mesh';
 import { addSceneOptimizer, setupArcRotateCamera } from './helper/scene';
 
 const sessionMode = 'immersive-ar';
-const referenceSpaceType = 'viewer';
+const referenceSpaceType = 'local-floor';
 
 export class App {
   private engine: Engine;
