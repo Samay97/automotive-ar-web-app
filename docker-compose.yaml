@@ -1,0 +1,10 @@
+version: '3'
+services:
+  automotiveapp:
+    image: nginx:latest
+    container_name: frontend
+    restart: always
+    ports:
+      - 4200:4200
+    volumes:
+      - ./dist/webxr-webapp-2:/app/automotive/
