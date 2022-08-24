@@ -110,7 +110,7 @@ export class App {
     // Activate features for webxr
     this.addAnchorSystem();
     this.addHitTest();
-    this.addLightEstimation();
+    // this.addLightEstimation();
     this.addBackroundRemover();
 
     xr.baseExperience.onStateChangedObservable.add((state: WebXRState) => {
@@ -380,6 +380,7 @@ export class App {
 
       // Add shadow
       if (dirLight) {
+        /*
         const shadowGenerator = new ShadowGenerator(1024, dirLight);
         shadowGenerator.useBlurExponentialShadowMap = true;
         shadowGenerator.useKernelBlur = true;
@@ -391,6 +392,7 @@ export class App {
         this.carRoot!.getChildMeshes().forEach((mesh: AbstractMesh) => {
           shadowGenerator.getShadowMap()?.renderList?.push(mesh);
         });
+        */
 
         addSceneOptimizer(this.scene);
 
