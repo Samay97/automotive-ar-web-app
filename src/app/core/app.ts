@@ -392,6 +392,7 @@ export class App {
         this.carRoot!.getChildMeshes().forEach((mesh: AbstractMesh) => {
           shadowGenerator.getShadowMap()?.renderList?.push(mesh);
         });
+        
         */
 
         addSceneOptimizer(this.scene);
